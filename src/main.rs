@@ -24,7 +24,7 @@ fn format_tekken_debtors(csv_path: &str) -> String {
             let total_hours = record.get(2).unwrap_or("0.0").trim().parse::<f32>().unwrap_or(0.0);
             if hours < total_hours {
                 let hours_left =  total_hours - hours;
-                message.push_str(&format!("@{} has {} hours owed with {} left to go!\n", name, hours, hours_left));
+                message.push_str(&format!("<@{}> has played {} hours and has {} hours left to go!\n", name, hours, hours_left));
             }
         }
     }
@@ -49,7 +49,7 @@ impl EventHandler for Handler {
         if let Ok(channel) = msg.channel_id.to_channel(&ctx).await {
             if let serenity::model::channel::Channel::Guild(guild_channel) = channel {
                 if guild_channel.name == "tekken-tracker" && msg.content == "!ping" {
-                    let _ = msg.channel_id.say(&ctx.http, "@Sapientor").await;
+                    let _ = msg.channel_id.say(&ctx.http, "<@451064565963161611>").await;
                 }
             }
         }
