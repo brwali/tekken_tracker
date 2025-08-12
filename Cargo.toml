@@ -1,0 +1,10 @@
+[package]
+name = "tekken_tracker"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+serenity = "0.12"
+dotenv = "0.15"
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+csv = "1.3"
