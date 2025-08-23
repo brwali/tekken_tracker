@@ -2,34 +2,128 @@ use serenity::prelude::*;
 use serenity::model::prelude::*;
 use serenity::Client;
 use std::env;
-use std::fs::File;
-use std::io::BufReader;
-use csv::Reader;
+use std::fs::{File, OpenOptions};
+use std::io::{BufReader};
+use csv::{Reader, Writer};
+use reqwest::Client as ReqwestClient;
+use chrono::prelude::*;
+use serde_json::Value;
 
 struct Handler;
 
-fn format_tekken_debtors(csv_path: &str) -> String {
+async fn send_steam_request(request: &str) -> Option<Value> {
+    let client = ReqwestClient::new();
+    let resp = client.get(request).send().await.ok()?;
+    let json: Value = resp.json().await.ok()?;
+    Some(json)
+}
+
+fn write_records_to_csv(csv_path: &str, records: &[Vec<String>]) -> std::io::Result<()> {
+    let mut wtr = Writer::from_writer(
+        OpenOptions::new().write(true).truncate(true).open(csv_path)?
+    );
+    wtr.write_record(&["discord_id","playtime","hours_owed","steam_id", "month_hours", "bet_hours_available"])?;
+    for record in records {
+        wtr.write_record(record)?;
+    }
+    wtr.flush()?;
+    Ok(())
+}
+
+fn time_check(time_path: &str) -> (String, String, String) {
+    let file = match File::open(time_path) {
+        Ok(f) => f,
+        Err(_) => return ("CSV file not found.".to_string(), "".to_string()),
+    };
+    let mut rdr = Reader::from_reader(BufReader::new(file));
+    let first_row = match rdr.records().next() {
+        Some(result) => match result {
+            Ok(r) => r,
+            Err(_) => return ("Error reading row".to_string(), "".to_string()),
+        },
+        None => return ("CSV is empty".to_string(), "".to_string()),
+    };
+
+    let month = first_row.get(0).unwrap_or("").to_string();
+    let week  = first_row.get(1).unwrap_or("").to_string();
+    let year = first_row.get(2).unwrap_or("").to_string();
+    (month, week, year)
+    }
+
+async fn format_tekken_debtors(csv_path: &str) -> (String, Vec<Vec<String>>) {
+    dotenv::dotenv().ok();
+    let api_key = env::var("API_KEY").expect("Expected a token in the environment");
+    let _tekken_id = 1778820;
     let file = match File::open(csv_path) {
         Ok(f) => f,
-        Err(_) => return "CSV file not found.".to_string(),
+        Err(_) => return ("CSV file not found.".to_string(), Vec::new()),
     };
     let mut rdr = Reader::from_reader(BufReader::new(file));
     let mut message = String::from("Tekken debtors:\n");
-
+    let mut updated_records: Vec<Vec<String>> = Vec::new();
+    // "https://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/?key={}&steamid={}&format=json"
     for result in rdr.records() {
         if let Ok(record) = result {
             // Assuming CSV columns: name, hours
             let name = record.get(0).unwrap_or("Unknown");
             let hours = record.get(1).unwrap_or("0.0").trim().parse::<f32>().unwrap_or(0.0);
             let total_hours = record.get(2).unwrap_or("0.0").trim().parse::<f32>().unwrap_or(0.0);
+            let mut playtime_outer = hours;
+            let mut updated_rowrecord:Vec<String> = record.iter().map(|s| s.to_string()).collect();
             if hours < total_hours {
+                let request = format!(
+                    "https://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/?key={}&steamid={}&format=json",
+                    api_key,
+                    record.get(3).unwrap_or("Unknown").trim()
+                );
+                if let Some(json) = send_steam_request(&request).await {
+                    // Safely get the games array
+                    if let Some(games) = json.get("response")
+                                            .and_then(|r| r.get("games"))
+                                            .and_then(|g| g.as_array()) {
+                        // Find the game with appid 1778820
+                        if let Some(tekken_game) = games.iter().find(|game| {
+                            game.get("appid").and_then(|id| id.as_u64()) == Some(1778820)
+                        }) {
+                            // Get playtime_forever in minutes
+                            let playtime = tekken_game.get("playtime_forever")
+                                                    .and_then(|p| p.as_u64())
+                                                    .unwrap_or(0);
+                            playtime_outer = ((playtime as f32 / 60.0) * 100.0).trunc() / 100.0;
+                            // Convert to hours for readability
+                        } else {
+                            println!("Tekken not found for this user.");
+                        }
+                    } else {
+                        println!("No games found in response.");
+                    }
+                }
                 let hours_left =  total_hours - hours;
-                message.push_str(&format!("<@{}> has played {} hours and has {} hours left to go!\n", name, hours, hours_left));
+                if hours == playtime_outer {
+                    message.push_str(&format!("<@{}> has played {} hours and has {} hours left to go!\nThey have played ZERO tekken hours since last time :(\n", name, hours, hours_left));
+                }
+                else {
+                    let playtime_string = playtime_outer.to_string();
+                    updated_rowrecord[1] = playtime_string;
+                    message.push_str(&format!("<@{}> has played {} hours and has {} hours left to go!\nThey have played {} tekken hours since last time, way to go :D!!!\n", name, playtime_outer, hours_left, playtime_outer - hours));
+                }
             }
+            updated_records.push(updated_rowrecord);
         }
     }
-
-    message
+    let (week, month, year) = time_check("time_info.csv");
+    let now = Local::now();
+    let current_month = now.month().to_string();
+    let current_day = now.day().to_string();
+    let current_year = now.year().to_string();
+    if month < current_month || (month >= current_month && year < current_year) {
+        //interest function
+    }
+    // need to convert to int and also do the logic to roll over months
+    if week + 7 == current_day {
+        // reset available bet hours
+    }
+    (message, updated_records)
 }
 
 #[serenity::async_trait]
@@ -40,7 +134,8 @@ impl EventHandler for Handler {
         let channel_id = ChannelId::new(1404935148419682304);
 
         // Read from CSV (example: first row, first column)
-        let message = format_tekken_debtors("tekken_hours.csv");
+        let (message, records) = format_tekken_debtors("tekken_hours.csv").await;
+        let _ = write_records_to_csv("tekken_hours.csv", &records);
         let _ = channel_id.say(&ctx.http, message).await;
     }
 
