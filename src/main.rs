@@ -33,15 +33,15 @@ fn write_records_to_csv(csv_path: &str, records: &[Vec<String>]) -> std::io::Res
 fn time_check(time_path: &str) -> (String, String, String) {
     let file = match File::open(time_path) {
         Ok(f) => f,
-        Err(_) => return ("CSV file not found.".to_string(), "".to_string()),
+        Err(_) => return ("CSV file not found.".to_string(), "".to_string(), "".to_string()),
     };
     let mut rdr = Reader::from_reader(BufReader::new(file));
     let first_row = match rdr.records().next() {
         Some(result) => match result {
             Ok(r) => r,
-            Err(_) => return ("Error reading row".to_string(), "".to_string()),
+            Err(_) => return ("Error reading row".to_string(), "".to_string(), "".to_string()),
         },
-        None => return ("CSV is empty".to_string(), "".to_string()),
+        None => return ("CSV is empty".to_string(), "".to_string(), "".to_string()),
     };
 
     let month = first_row.get(0).unwrap_or("").to_string();
@@ -114,15 +114,16 @@ async fn format_tekken_debtors(csv_path: &str) -> (String, Vec<Vec<String>>) {
     let (week, month, year) = time_check("time_info.csv");
     let now = Local::now();
     let current_month = now.month().to_string();
+    println!("{}", week);
     let current_day = now.day().to_string();
     let current_year = now.year().to_string();
     if month < current_month || (month >= current_month && year < current_year) {
         //interest function
     }
     // need to convert to int and also do the logic to roll over months
-    if week + 7 == current_day {
-        // reset available bet hours
-    }
+    // if week + 7 == current_day {
+    //     // reset available bet hours
+    // }
     (message, updated_records)
 }
 
