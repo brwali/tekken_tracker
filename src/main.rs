@@ -50,17 +50,41 @@ fn time_check(time_path: &str) -> (String, String, String) {
     (month, week, year)
     }
 
-async fn format_tekken_debtors(csv_path: &str) -> (String, Vec<Vec<String>>) {
+async fn format_tekken_debtors(csv_path: &str) -> (String, Vec<Vec<String>>, Vec<Vec<String>>) {
     dotenv::dotenv().ok();
     let api_key = env::var("API_KEY").expect("Expected a token in the environment");
     let _tekken_id = 1778820;
     let file = match File::open(csv_path) {
         Ok(f) => f,
-        Err(_) => return ("CSV file not found.".to_string(), Vec::new()),
+        Err(_) => return ("CSV file not found.".to_string(), Vec::new(), Vec::new()),
     };
     let mut rdr = Reader::from_reader(BufReader::new(file));
     let mut message = String::from("Tekken debtors:\n");
     let mut updated_records: Vec<Vec<String>> = Vec::new();
+    let mut updated_time_record: Vec<Vec<String>> = Vec::new();
+    let (month, week, year) = time_check("time_info.csv");
+    let now = Local::now();
+    let current_month = now.month();
+    let current_year = now.year();
+    let mut week_int = week.parse::<i32>().unwrap_or(0);
+    let month_int = month.parse::<u32>().unwrap_or(0);
+    let year_int = year.parse::<i32>().unwrap_or(0);
+    let mut new_week = false;
+    if week_int == 7 {
+        week_int = 0;
+        new_week = true;
+    }
+    else {
+        week_int += 1;
+    }
+    let mut updated_timerow:Vec<String> = [month, week, year].to_vec();
+    if month_int != current_month {
+        updated_timerow[0] = current_month.to_string();
+    }
+    if year_int != current_year {
+        updated_timerow[2] = current_year.to_string();
+    }
+    updated_timerow[1] = week_int.to_string();
     // "https://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/?key={}&steamid={}&format=json"
     for result in rdr.records() {
         if let Ok(record) = result {
@@ -107,24 +131,27 @@ async fn format_tekken_debtors(csv_path: &str) -> (String, Vec<Vec<String>>) {
                     updated_rowrecord[1] = playtime_string;
                     message.push_str(&format!("<@{}> has played {} hours and has {} hours left to go!\nThey have played {} tekken hours since last time, way to go :D!!!\n", name, playtime_outer, hours_left, playtime_outer - hours));
                 }
+                // If its a new month and we need to see if interest should be added
+                if month_int < current_month || (month_int >= current_month && year_int < current_year) {
+                    let monthy_hours = record.get(4).unwrap_or("0").parse::<i32>().unwrap_or(0);
+                    if monthy_hours < 5 {
+                        playtime_outer = hours_left + (hours_left * 0.05);
+                        updated_rowrecord[1] = playtime_outer.to_string();
+                        message.push_str(&format!("<@{}> has not played their 5 monthly tekken hours and has incurred the 5% interest penalty. They now owe {} more hours D:", name, (hours_left*0.05)));
+                    }
+                    // reset monthly play counter
+                    updated_rowrecord[4] = "0".to_string();
+                }
+                // Check to see if its a new week and if so reset available betting hours
+                if new_week {
+                    updated_rowrecord[5] = "0".to_string();
+                }
             }
             updated_records.push(updated_rowrecord);
         }
     }
-    let (week, month, year) = time_check("time_info.csv");
-    let now = Local::now();
-    let current_month = now.month().to_string();
-    println!("{}", week);
-    let current_day = now.day().to_string();
-    let current_year = now.year().to_string();
-    if month < current_month || (month >= current_month && year < current_year) {
-        //interest function
-    }
-    // need to convert to int and also do the logic to roll over months
-    // if week + 7 == current_day {
-    //     // reset available bet hours
-    // }
-    (message, updated_records)
+    updated_time_record.push(updated_timerow);
+    (message, updated_records, updated_time_record)
 }
 
 #[serenity::async_trait]
@@ -135,8 +162,9 @@ impl EventHandler for Handler {
         let channel_id = ChannelId::new(1404935148419682304);
 
         // Read from CSV (example: first row, first column)
-        let (message, records) = format_tekken_debtors("tekken_hours.csv").await;
+        let (message, records, time_records) = format_tekken_debtors("tekken_hours.csv").await;
         let _ = write_records_to_csv("tekken_hours.csv", &records);
+        let _ = write_records_to_csv("time_info.csv", &time_records);
         let _ = channel_id.say(&ctx.http, message).await;
     }
 
