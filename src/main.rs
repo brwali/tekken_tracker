@@ -16,7 +16,7 @@ use serde_json::Value;
 struct Handler;
 #[derive(Clone)]
 struct Bet {
-    user1: &str,
+    user1: String,
     user2: String,
     bet: f32,
     ticket_no: i32,
@@ -32,8 +32,8 @@ struct BetOverlord {
 impl Bet {
     pub fn new(u1: &str, u2: &str, b: f32, tno: i32) -> Self {
         Bet {
-            user1: u1,
-            user2: u2,
+            user1: u1.to_string(),
+            user2: u2.to_string(),
             bet: b,
             ticket_no: tno,
         }
@@ -51,10 +51,10 @@ impl BetOverlord {
         }
     }
     fn can_bet(&self, id: &str) -> bool {
-        self.betters.contains(&id)
+        self.betters.contains(id)
     }
     fn is_trusted(&self, id: &str) -> bool {
-        self.trusted_users.contains(&id)
+        self.trusted_users.contains(id)
     }
     fn add_better(&mut self, id: String) {
         self.betters.insert(id);
@@ -66,19 +66,19 @@ impl BetOverlord {
         self.hours_available.insert(id, hours);
     }
     fn hour_check(&self, id1: &str, id2: &str, bet: f32) -> bool {
-        let p1_hours = self.hours_available.get(&id1);
-        let p2_hours = self.hours_available.get(&id2);
+        let p1_hours = self.hours_available.get(id1);
+        let p2_hours = self.hours_available.get(id2);
         *p1_hours.unwrap() + bet <= 10.0 && *p2_hours.unwrap() + bet <= 10.0
     }
     fn get_bet_hours(&self, id: &str) -> f32 {
-        match self.hours_available.get(&id) {
+        match self.hours_available.get(id) {
             Some(&val) => val,
             None => -1.0,
         }
     }
-    fn handle_bet_creation(&mut self, id1: &str, id2: &str, bet: f32) -> i32 {
+    fn handle_bet_creation(&mut self, id1: String, id2: String, bet: f32) -> i32 {
         let ticket_no: i32 = self.counter;
-        let bet_ticket: Bet = Bet::new(id1, id2, bet, ticket_no);
+        let bet_ticket: Bet = Bet::new(&id1, &id2, bet, ticket_no);
         self.counter += 1;
         self.bet_house.lock().unwrap().insert(ticket_no, bet_ticket);
         let p1_hours = self.hours_available.get(&id1).unwrap() - bet;
@@ -87,7 +87,7 @@ impl BetOverlord {
         let _ = self.update_bet_hours(id2.to_string(), p2_hours);
         ticket_no
     }
-    fn handle_bet_resolution(&mut self, ticket_no: i32) {
+    fn handle_bet_resolution(&mut self, _ticket_no: i32) {
 
     }
 }
@@ -232,7 +232,7 @@ async fn format_tekken_debtors(csv_path: &str) -> (String, Vec<Vec<String>>, Vec
                 updated_rowrecord[5] = "0".to_string();
             }
             else {
-                updated_rowrecord[5] = KW.lock().unwrap().get_bet_hours(name.to_string()).to_string();
+                updated_rowrecord[5] = KW.lock().unwrap().get_bet_hours(name).to_string();
             }
             updated_records.push(updated_rowrecord);
         }
@@ -266,11 +266,15 @@ fn setup_betting_manager() {
     KW.lock().unwrap().add_better("<@303219081941614592>".to_string());
     // Add Bryan
     KW.lock().unwrap().add_better("<@259826437022810112>".to_string());
-    //TODO: add KWangwon's id
-    //Now we need to add the trusted third party members
-    KW.lock().unwrap().add_trusted("<@451064565963161611>".to_string())
-    //TODO: add KWangwon's id
-    //TODO: add Daniel's id
+    // Add Kwangwon
+    KW.lock().unwrap().add_better("<@389916126626185216>".to_string());
+    //Now we need to add the trusted third party members\
+    // Add Brandon
+    KW.lock().unwrap().add_trusted("<@451064565963161611>".to_string());
+    // Add Kwangwon
+    KW.lock().unwrap().add_trusted("<@389916126626185216>".to_string());
+    // Add Daniel
+    KW.lock().unwrap().add_trusted("<@230147129492897794>".to_string());
 }
 
 #[serenity::async_trait]
@@ -305,7 +309,7 @@ impl EventHandler for Handler {
                     let bet_init = msg.author.to_string();
                     let bet_recp = parts[1].to_string();
                     if KW.lock().unwrap().can_bet(&bet_recp) && KW.lock().unwrap().hour_check(&bet_init, &bet_recp, bet_amount) {
-                        let ticket_no = KW.lock().unwrap().handle_bet_creation(&bet_init, &bet_recp, bet_amount);
+                        let ticket_no = KW.lock().unwrap().handle_bet_creation(bet_init, bet_recp, bet_amount);
                         let _ = msg.channel_id.say(&ctx.http, ticket_no.to_string()).await;
                     }
                 }
