@@ -1,16 +1,99 @@
 use serenity::prelude::*;
 use serenity::model::prelude::*;
 use serenity::Client;
+use once_cell::sync::Lazy;
+use std::sync::{Arc, Mutex};
 use std::env;
+use std::collections::{HashSet, HashMap};
 use std::fs::{File, OpenOptions};
 use std::io::{BufReader};
 use csv::{Reader, Writer};
 use reqwest::Client as ReqwestClient;
 use chrono::prelude::*;
+use tokio::time::{sleep, Duration};
 use serde_json::Value;
 
 struct Handler;
+#[derive(Clone)]
+struct Bet {
+    user1: &str,
+    user2: String,
+    bet: f32,
+    ticket_no: i32,
+}
+struct BetOverlord {
+    betters: HashSet<String>,
+    trusted_users: HashSet<String>,
+    hours_available: HashMap<String, f32>,
+    bet_house: Arc<Mutex<HashMap<i32, Bet>>>,
+    counter: i32,
+}
 
+impl Bet {
+    pub fn new(u1: &str, u2: &str, b: f32, tno: i32) -> Self {
+        Bet {
+            user1: u1,
+            user2: u2,
+            bet: b,
+            ticket_no: tno,
+        }
+    }
+}
+
+impl BetOverlord {
+    pub fn new() -> Self {
+        BetOverlord {
+            betters: HashSet::<String>::new(),
+            trusted_users: HashSet::<String>::new(),
+            hours_available: HashMap::<String, f32>::new(),
+            bet_house: Arc::new(Mutex::new(HashMap::<i32, Bet>::new())),
+            counter: 0,
+        }
+    }
+    fn can_bet(&self, id: &str) -> bool {
+        self.betters.contains(&id)
+    }
+    fn is_trusted(&self, id: &str) -> bool {
+        self.trusted_users.contains(&id)
+    }
+    fn add_better(&mut self, id: String) {
+        self.betters.insert(id);
+    }
+    fn add_trusted(&mut self, id: String) {
+        self.trusted_users.insert(id);
+    }
+    fn update_bet_hours(&mut self, id: String, hours: f32) {
+        self.hours_available.insert(id, hours);
+    }
+    fn hour_check(&self, id1: &str, id2: &str, bet: f32) -> bool {
+        let p1_hours = self.hours_available.get(&id1);
+        let p2_hours = self.hours_available.get(&id2);
+        *p1_hours.unwrap() + bet <= 10.0 && *p2_hours.unwrap() + bet <= 10.0
+    }
+    fn get_bet_hours(&self, id: &str) -> f32 {
+        match self.hours_available.get(&id) {
+            Some(&val) => val,
+            None => -1.0,
+        }
+    }
+    fn handle_bet_creation(&mut self, id1: &str, id2: &str, bet: f32) -> i32 {
+        let ticket_no: i32 = self.counter;
+        let bet_ticket: Bet = Bet::new(id1, id2, bet, ticket_no);
+        self.counter += 1;
+        self.bet_house.lock().unwrap().insert(ticket_no, bet_ticket);
+        let p1_hours = self.hours_available.get(&id1).unwrap() - bet;
+        let p2_hours = self.hours_available.get(&id2).unwrap() - bet;
+        let _ = self.update_bet_hours(id1.to_string(), p1_hours);
+        let _ = self.update_bet_hours(id2.to_string(), p2_hours);
+        ticket_no
+    }
+    fn handle_bet_resolution(&mut self, ticket_no: i32) {
+
+    }
+}
+static KW: Lazy<Mutex<BetOverlord>> = Lazy::new(|| {
+    Mutex::new(BetOverlord::new())
+});
 async fn send_steam_request(request: &str) -> Option<Value> {
     let client = ReqwestClient::new();
     let resp = client.get(request).send().await.ok()?;
@@ -18,11 +101,11 @@ async fn send_steam_request(request: &str) -> Option<Value> {
     Some(json)
 }
 
-fn write_records_to_csv(csv_path: &str, records: &[Vec<String>]) -> std::io::Result<()> {
+fn write_records_to_csv(csv_path: &str, header: &[&str], records: &[Vec<String>]) -> std::io::Result<()> {
     let mut wtr = Writer::from_writer(
         OpenOptions::new().write(true).truncate(true).open(csv_path)?
     );
-    wtr.write_record(&["discord_id","playtime","hours_owed","steam_id", "month_hours", "bet_hours_available"])?;
+    wtr.write_record(header)?;
     for record in records {
         wtr.write_record(record)?;
     }
@@ -142,10 +225,14 @@ async fn format_tekken_debtors(csv_path: &str) -> (String, Vec<Vec<String>>, Vec
                     // reset monthly play counter
                     updated_rowrecord[4] = "0".to_string();
                 }
-                // Check to see if its a new week and if so reset available betting hours
-                if new_week {
-                    updated_rowrecord[5] = "0".to_string();
-                }
+            }
+            // Check to see if its a new week and if so reset available betting hours
+            if new_week {
+                KW.lock().unwrap().update_bet_hours(name.to_string(), 0.0);
+                updated_rowrecord[5] = "0".to_string();
+            }
+            else {
+                updated_rowrecord[5] = KW.lock().unwrap().get_bet_hours(name.to_string()).to_string();
             }
             updated_records.push(updated_rowrecord);
         }
@@ -154,26 +241,77 @@ async fn format_tekken_debtors(csv_path: &str) -> (String, Vec<Vec<String>>, Vec
     (message, updated_records, updated_time_record)
 }
 
+async fn daily_check() -> String {
+    let (message, records, time_records) = format_tekken_debtors("tekken_hours.csv").await;
+    let main_header = ["discord_id","playtime","hours_owed","steam_id", "month_hours", "bet_hours_available"];
+    let _ = write_records_to_csv("tekken_hours.csv", &main_header, &records);
+    let time_header = ["month", "week", "year"];
+    let _ = write_records_to_csv("time_info.csv", &time_header,  &time_records);
+    message
+}
+
+fn setup_betting_manager() {
+    // First we need to add the people who can bet
+    // Add Jackson
+    KW.lock().unwrap().add_better("<@259508260082548747>".to_string());
+    // Add Mason
+    KW.lock().unwrap().add_better("<@236622475612389377>".to_string());
+    // Add Jonathan
+    KW.lock().unwrap().add_better("<@489595366174490624>".to_string());
+    // Add Logan
+    KW.lock().unwrap().add_better("<@258772151585341440>".to_string());
+    // Add Brandon
+    KW.lock().unwrap().add_better("<@451064565963161611>".to_string());
+    // Add Wyatt
+    KW.lock().unwrap().add_better("<@303219081941614592>".to_string());
+    // Add Bryan
+    KW.lock().unwrap().add_better("<@259826437022810112>".to_string());
+    //TODO: add KWangwon's id
+    //Now we need to add the trusted third party members
+    KW.lock().unwrap().add_trusted("<@451064565963161611>".to_string())
+    //TODO: add KWangwon's id
+    //TODO: add Daniel's id
+}
+
 #[serenity::async_trait]
 impl EventHandler for Handler {
 
     async fn ready(&self, ctx: Context, _data: Ready) {
-        // Replace with your channel ID
-        let channel_id = ChannelId::new(1404935148419682304);
 
+        setup_betting_manager();
+
+        let http = ctx.http.clone();
         // Read from CSV (example: first row, first column)
-        let (message, records, time_records) = format_tekken_debtors("tekken_hours.csv").await;
-        let _ = write_records_to_csv("tekken_hours.csv", &records);
-        let _ = write_records_to_csv("time_info.csv", &time_records);
-        let _ = channel_id.say(&ctx.http, message).await;
+        tokio::spawn(async move {
+            loop {
+                let message = daily_check().await;
+                // TODO: Replace with tree id when ready
+                let channel_id = ChannelId::new(1404935148419682304);
+                let _ = channel_id.say(&http, message).await;
+                sleep(Duration::from_secs(60 * 60 * 24)).await;
+            }
+        });
     }
 
     async fn message(&self, ctx: Context, msg: Message) {
         // Fetch the channel object
+        //TODO: message validation because you cannot trust the people who are going to use this bot
         if let Ok(channel) = msg.channel_id.to_channel(&ctx).await {
             if let serenity::model::channel::Channel::Guild(guild_channel) = channel {
-                if guild_channel.name == "tekken-tracker" && msg.content == "!ping" {
-                    let _ = msg.channel_id.say(&ctx.http, "<@451064565963161611>").await;
+                if guild_channel.name == "tekken-tracker" && msg.content.starts_with("!bet") && KW.lock().unwrap().can_bet(&msg.author.to_string()) {
+                    let parts: Vec<&str> = msg.content.split_whitespace().collect();
+                    // the type is def wrong here for the bets argh
+                    let bet_amount = parts[2].parse::<f32>().unwrap_or(-1.0);
+                    let bet_init = msg.author.to_string();
+                    let bet_recp = parts[1].to_string();
+                    if KW.lock().unwrap().can_bet(&bet_recp) && KW.lock().unwrap().hour_check(&bet_init, &bet_recp, bet_amount) {
+                        let ticket_no = KW.lock().unwrap().handle_bet_creation(&bet_init, &bet_recp, bet_amount);
+                        let _ = msg.channel_id.say(&ctx.http, ticket_no.to_string()).await;
+                    }
+                }
+                if guild_channel.name == "tekken-tracker" && msg.content.starts_with("!winner") && KW.lock().unwrap().is_trusted(&msg.author.to_string()) {
+                    let _parts: Vec<&str> = msg.content.split_whitespace().collect();
+
                 }
             }
         }
