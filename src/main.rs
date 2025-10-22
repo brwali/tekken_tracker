@@ -3,17 +3,13 @@ use serenity::model::prelude::*;
 use serenity::Client;
 use once_cell::sync::Lazy;
 use std::sync::{Arc, Mutex};
-use once_cell::sync::Lazy;
-use std::sync::{Arc, Mutex};
 use std::env;
-use std::collections::{HashSet, HashMap};
 use std::collections::{HashSet, HashMap};
 use std::fs::{File, OpenOptions};
 use std::io::{BufReader};
 use csv::{Reader, Writer};
 use reqwest::Client as ReqwestClient;
 use chrono::prelude::*;
-use tokio::time::{sleep, Duration};
 use tokio::time::{sleep, Duration};
 use serde_json::Value;
 
@@ -95,7 +91,7 @@ impl BetOverlord {
 
     }
 }
-static bet_handler: Lazy<Mutex<BetOverlord>> = Lazy::new(|| {
+static BET_HANDLER: Lazy<Mutex<BetOverlord>> = Lazy::new(|| {
     Mutex::new(BetOverlord::new())
 });
 async fn send_steam_request(request: &str) -> Option<Value> {
@@ -232,11 +228,11 @@ async fn format_tekken_debtors(csv_path: &str) -> (String, Vec<Vec<String>>, Vec
             }
             // Check to see if its a new week and if so reset available betting hours
             if new_week {
-                bet_handler.lock().unwrap().update_bet_hours(name.to_string(), 0.0);
+                BET_HANDLER.lock().unwrap().update_bet_hours(name.to_string(), 0.0);
                 updated_rowrecord[5] = "0".to_string();
             }
             else {
-                updated_rowrecord[5] = bet_handler.lock().unwrap().get_bet_hours(name).to_string();
+                updated_rowrecord[5] = BET_HANDLER.lock().unwrap().get_bet_hours(name).to_string();
             }
             updated_records.push(updated_rowrecord);
         }
@@ -257,28 +253,28 @@ async fn daily_check() -> String {
 fn setup_betting_manager() {
     // First we need to add the people who can bet
     // Add Jackson
-    bet_handler.lock().unwrap().add_better("<@259508260082548747>".to_string());
+    BET_HANDLER.lock().unwrap().add_better("<@259508260082548747>".to_string());
     // Add Mason
-    bet_handler.lock().unwrap().add_better("<@236622475612389377>".to_string());
+    BET_HANDLER.lock().unwrap().add_better("<@236622475612389377>".to_string());
     // Add Jonathan
-    bet_handler.lock().unwrap().add_better("<@489595366174490624>".to_string());
+    BET_HANDLER.lock().unwrap().add_better("<@489595366174490624>".to_string());
     // Add Logan
-    bet_handler.lock().unwrap().add_better("<@258772151585341440>".to_string());
+    BET_HANDLER.lock().unwrap().add_better("<@258772151585341440>".to_string());
     // Add Brandon
-    bet_handler.lock().unwrap().add_better("<@451064565963161611>".to_string());
+    BET_HANDLER.lock().unwrap().add_better("<@451064565963161611>".to_string());
     // Add Wyatt
-    bet_handler.lock().unwrap().add_better("<@303219081941614592>".to_string());
+    BET_HANDLER.lock().unwrap().add_better("<@303219081941614592>".to_string());
     // Add Bryan
-    bet_handler.lock().unwrap().add_better("<@259826437022810112>".to_string());
+    BET_HANDLER.lock().unwrap().add_better("<@259826437022810112>".to_string());
     // Add Kwangwon
-    bet_handler.lock().unwrap().add_better("<@389916126626185216>".to_string());
+    BET_HANDLER.lock().unwrap().add_better("<@389916126626185216>".to_string());
     //Now we need to add the trusted third party members\
     // Add Brandon
-    bet_handler.lock().unwrap().add_trusted("<@451064565963161611>".to_string());
+    BET_HANDLER.lock().unwrap().add_trusted("<@451064565963161611>".to_string());
     // Add Kwangwon
-    bet_handler.lock().unwrap().add_trusted("<@389916126626185216>".to_string());
+    BET_HANDLER.lock().unwrap().add_trusted("<@389916126626185216>".to_string());
     // Add Daniel
-    bet_handler.lock().unwrap().add_trusted("<@230147129492897794>".to_string());
+    BET_HANDLER.lock().unwrap().add_trusted("<@230147129492897794>".to_string());
 }
 
 #[serenity::async_trait]
@@ -306,18 +302,18 @@ impl EventHandler for Handler {
         //TODO: message validation because you cannot trust the people who are going to use this bot
         if let Ok(channel) = msg.channel_id.to_channel(&ctx).await {
             if let serenity::model::channel::Channel::Guild(guild_channel) = channel {
-                if guild_channel.name == "tekken-tracker" && msg.content.starts_with("!bet") && bet_handler.lock().unwrap().can_bet(&msg.author.to_string()) {
+                if guild_channel.name == "tekken-tracker" && msg.content.starts_with("!bet") && BET_HANDLER.lock().unwrap().can_bet(&msg.author.to_string()) {
                     let parts: Vec<&str> = msg.content.split_whitespace().collect();
                     // the type is def wrong here for the bets argh
                     let bet_amount = parts[2].parse::<f32>().unwrap_or(-1.0);
                     let bet_init = msg.author.to_string();
                     let bet_recp = parts[1].to_string();
-                    if bet_handler.lock().unwrap().can_bet(&bet_recp) && bet_handler.lock().unwrap().hour_check(&bet_init, &bet_recp, bet_amount) {
-                        let ticket_no = bet_handler.lock().unwrap().handle_bet_creation(bet_init, bet_recp, bet_amount);
+                    if BET_HANDLER.lock().unwrap().can_bet(&bet_recp) && BET_HANDLER.lock().unwrap().hour_check(&bet_init, &bet_recp, bet_amount) {
+                        let ticket_no = BET_HANDLER.lock().unwrap().handle_bet_creation(bet_init, bet_recp, bet_amount);
                         let _ = msg.channel_id.say(&ctx.http, ticket_no.to_string()).await;
                     }
                 }
-                if guild_channel.name == "tekken-tracker" && msg.content.starts_with("!winner") && bet_handler.lock().unwrap().is_trusted(&msg.author.to_string()) {
+                if guild_channel.name == "tekken-tracker" && msg.content.starts_with("!winner") && BET_HANDLER.lock().unwrap().is_trusted(&msg.author.to_string()) {
                     let _parts: Vec<&str> = msg.content.split_whitespace().collect();
 
                 }
