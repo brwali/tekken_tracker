@@ -1,3 +1,4 @@
+use crate::db;
 use std::sync::{Arc, Mutex};
 use std::collections::{HashSet, HashMap};
 
@@ -77,7 +78,22 @@ impl BetOverlord {
         let _ = self.update_bet_hours(id2.to_string(), p2_hours);
         ticket_no
     }
-    pub fn handle_bet_resolution(&mut self, _ticket_no: i32, winner: String) {
-        
+
+    fn bet_payout(&self, _user: String, _winner: bool) {
+
+    }
+
+    pub fn handle_bet_resolution(&mut self, ticket_no: i32, winner: String) {
+        let ticket = self.bet_house.get(ticket_no);
+        // Check that the user who was passed in was actually on the ticket
+        if winner == ticket.user1 {
+            self.bet_payout(winner, true);
+            self.bet_payout(ticket.user2, false);
+        } else if winner == ticket.user2 {
+            self.bet_payout(winner, true);
+            self.bet_payout(ticket.user1, false);
+        } else {
+
+        }
     }
 }
