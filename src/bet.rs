@@ -1,5 +1,6 @@
 use crate::db;
 use std::sync::{Arc, Mutex};
+use rusqlite::Connection;
 use std::collections::{HashSet, HashMap};
 
 #[derive(Clone)]
@@ -14,6 +15,7 @@ pub struct BetOverlord {
     trusted_users: HashSet<String>,
     hours_available: HashMap<String, f32>,
     bet_house: Arc<Mutex<HashMap<i32, Bet>>>,
+    name_relation: HashMap<String, String>,
     counter: i32,
 }
 
@@ -26,8 +28,17 @@ impl Bet {
             ticket_no: tno,
         }
     }
-    fn get_amount(&self) -> f32 {
+    pub fn get_amount(&self) -> f32 {
         self.bet
+    }
+    pub fn get_user1(&self) -> &str {
+        &self.user1
+    }
+    pub fn get_user2(&self) -> &str {
+        &self.user2
+    }
+    pub fn get_ticket_no(&self) -> i32 {
+        self.ticket_no
     }
 }
 
@@ -38,6 +49,7 @@ impl BetOverlord {
             trusted_users: HashSet::<String>::new(),
             hours_available: HashMap::<String, f32>::new(),
             bet_house: Arc::new(Mutex::new(HashMap::<i32, Bet>::new())),
+            name_relation: HashMap::<String, String>::new(),
             counter: 0,
         }
     }
@@ -50,16 +62,36 @@ impl BetOverlord {
     pub fn add_better(&mut self, id: String) {
         self.betters.insert(id);
     }
+    pub fn add_relation(&mut self, id: String, name: String) {
+        self.name_relation.insert(id, name);
+    }
     pub fn add_trusted(&mut self, id: String) {
         self.trusted_users.insert(id);
     }
     pub fn update_bet_hours(&mut self, id: String, hours: f32) {
         self.hours_available.insert(id, hours);
     }
+    pub fn list_bets(&self) -> String {
+        let mut message = String::from("Tekken bets in progress:\n");
+        let binding = self.bet_house.lock().unwrap();
+        println!("here");
+        for (ticket_no, bet) in binding.iter() {
+            let name1 = self.name_relation.get(bet.get_user1());
+            println!("{}", name1.map_or("err", |v| v).to_string());
+            let name2 = self.name_relation.get(bet.get_user2());
+            message.push_str(
+                &format!("Bet number: {} - debtor one: {} debtor two: {} - bet amount: {}\n",
+                    ticket_no, name1.map_or("mystery man", |v| v), name2.map_or("mystery man", |v| v), bet.get_amount()
+                )
+            );
+        }
+        message
+    }
     pub fn hour_check(&self, id1: &str, id2: &str, bet: f32) -> bool {
-        let p1_hours = self.hours_available.get(id1);
-        let p2_hours = self.hours_available.get(id2);
-        *p1_hours.unwrap() + bet <= 10.0 && *p2_hours.unwrap() + bet <= 10.0
+        match (self.hours_available.get(id1), self.hours_available.get(id2)) {
+            (Some(p1), Some(p2)) => *p1 - bet >= 0.0 && *p2 - bet >= 0.0,
+            _ => false,
+        }
     }
     pub fn get_bet_hours(&self, id: &str) -> f32 {
         match self.hours_available.get(id) {
@@ -72,28 +104,28 @@ impl BetOverlord {
         let bet_ticket: Bet = Bet::new(&id1, &id2, bet, ticket_no);
         self.counter += 1;
         self.bet_house.lock().unwrap().insert(ticket_no, bet_ticket);
-        let p1_hours = self.hours_available.get(&id1).unwrap() + bet;
-        let p2_hours = self.hours_available.get(&id2).unwrap() + bet;
-        let _ = self.update_bet_hours(id1.to_string(), p1_hours);
-        let _ = self.update_bet_hours(id2.to_string(), p2_hours);
+        let p1_hours = self.hours_available.get(&id1).unwrap() - bet;
+        let p2_hours = self.hours_available.get(&id2).unwrap() - bet;
+        let _ = self.update_bet_hours(id1, p1_hours);
+        let _ = self.update_bet_hours(id2, p2_hours);
         ticket_no
     }
 
-    fn bet_payout(&self, _user: String, _winner: bool) {
-
-    }
-
-    pub fn handle_bet_resolution(&mut self, ticket_no: i32, winner: String) {
-        let ticket = self.bet_house.get(ticket_no);
+    pub fn handle_bet_resolution(&self, db: Arc<Mutex<Connection>>, ticket_no: i32, winner: String) -> bool {
+        let mut binding = self.bet_house.lock().unwrap();
+        let ticket = binding.get(&ticket_no).unwrap();
+        let db_connection = db.lock().unwrap();
         // Check that the user who was passed in was actually on the ticket
-        if winner == ticket.user1 {
-            self.bet_payout(winner, true);
-            self.bet_payout(ticket.user2, false);
-        } else if winner == ticket.user2 {
-            self.bet_payout(winner, true);
-            self.bet_payout(ticket.user1, false);
+        if winner == ticket.get_user1() {
+            let _ = db::bet_result(&db_connection, ticket.get_amount() * -1.0, &winner);
+            let _ = db::bet_result(&db_connection, ticket.get_amount(), &ticket.get_user2());
+        } else if winner == ticket.get_user2() {
+            let _ = db::bet_result(&db_connection, ticket.get_amount() * -1.0, &winner);
+            let _ = db::bet_result(&db_connection, ticket.get_amount(), &ticket.get_user1());
         } else {
-
+            return false;
         }
+        let _ = binding.remove(&ticket_no);
+        return true;
     }
 }

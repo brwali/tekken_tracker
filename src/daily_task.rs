@@ -137,3 +137,25 @@ pub async fn daily_check(db: Arc<Mutex<Connection>>, bet_handler:&mut BetOverlor
     let message = update_debt_hours(db.clone(), bet_handler).await;
     message
 }
+
+pub fn get_user_debts(db: Arc<Mutex<Connection>>) -> String {
+    let mut message = String::from("Tekken debtors:\n");
+    let db_connection = db.lock().unwrap();
+    match db::get_users(&db_connection) {
+        Ok(users) => {
+            for user in users {
+                let name = user.get_name();
+                let playtime = user.get_playtime();
+                let hours_owed = user.get_hours_owed();
+                let time_left = hours_owed - playtime;
+                if time_left > 0.0 {
+                    message.push_str(&format!("{} has played {} hours and still has {} hours left. As a reminder {} has {} total hours owed.\n", name, playtime, time_left, name, hours_owed));
+                }
+            }
+        }
+        Err(e) => {
+            println!("Database error: {:?}", e);
+        }
+    }
+    message
+}

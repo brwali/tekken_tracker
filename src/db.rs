@@ -154,8 +154,33 @@ pub fn get_users(conn: &Connection) -> Result<Vec<User>, rusqlite::Error> {
 
 pub fn update_user(conn: &Connection, user: User) -> rusqlite::Result<()> {
     conn.execute(
-        "UPDATE users SET playtime = ?, hours_owed = ?, monthly_hours = ?, bet_hours_available = ?",
-        params![user.playtime, user.hours_owed, user.monthly_hours, user.bet_hours_available],
+        "UPDATE users SET playtime = ?, hours_owed = ?, monthly_hours = ?, bet_hours_available = ? WHERE id = ?",
+        params![user.playtime, user.hours_owed, user.monthly_hours, user.bet_hours_available, user.id],
+    )?;
+    Ok(())
+}
+
+pub fn bet_result(conn: &Connection, amount: f32, id: &str) -> rusqlite::Result<()> {
+    let query = "SELECT * FROM users WHERE id = ? ";
+    let mut statement = conn.prepare(query)?;
+    let user_collection = statement.query_map([id], |row| {
+        Ok(User {
+            id: row.get(0)?,
+            name: row.get(1)?,
+            playtime: row.get(2)?,
+            hours_owed: row.get(3)?,
+            steam_id: row.get(4)?,
+            monthly_hours: row.get(5)?,
+            bet_hours_available: row.get(6)?,
+        })
+    })?;
+    let mut bet_total = amount;
+    for user in user_collection {
+        bet_total += user.unwrap().get_hours_owed();
+    }
+    conn.execute(
+        "UPDATE users SET hours_owed = ? WHERE id = ?",
+        params![bet_total, id],
     )?;
     Ok(())
 }
