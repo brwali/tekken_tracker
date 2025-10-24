@@ -141,14 +141,13 @@ async fn update_debt_hours(db: Arc<Mutex<Connection>>, bet_handler:&mut BetOverl
                     } else {
                         message.push_str(&format!("This week {} has {} {} hours through bets.\n\n", birth_name, change, hours_earned));
                     }
-                    bet_handler.update_bet_hours(name.to_string(), 0.0);
-                    user.set_bet_hours_available(0.0);
+                    bet_handler.update_bet_hours(name.to_string(), 10.0);
+                    user.set_bet_hours_available(10.0);
                     bet_handler.update_hour_change(name, 0.0);
                 }
                 else {
                     user.set_bet_hours_available(bet_handler.get_bet_hours(&name));
                 }
-                //TODO: update user now in db
                 let _ = db::update_user(&db_connection, user.clone());
             }
         }

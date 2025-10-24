@@ -18,6 +18,9 @@ static BET_HANDLER: Lazy<Mutex<bet::BetOverlord>> = Lazy::new(|| {
     Mutex::new(bet::BetOverlord::new())
 });
 
+const BRANDON_ID:&str  = "451064565963161611";
+const KWANGWON_ID:&str  = "389916126626185216";
+
 fn setup_betting_manager() {
     // First we need to add the people who can bet
     // Add Jackson
@@ -45,7 +48,6 @@ fn setup_betting_manager() {
     BET_HANDLER.lock().unwrap().update_bet_hours(LOGAN_ID.to_string(), 10.0);
     BET_HANDLER.lock().unwrap().update_hour_change(LOGAN_ID.to_string(), 0.0);
     // Add Brandon
-    const BRANDON_ID:&str  = "451064565963161611";
     BET_HANDLER.lock().unwrap().add_better(BRANDON_ID.to_string());
     BET_HANDLER.lock().unwrap().add_relation(BRANDON_ID.to_string(), "Brandon".to_string());
     BET_HANDLER.lock().unwrap().update_bet_hours(BRANDON_ID.to_string(), 10.0);
@@ -63,7 +65,6 @@ fn setup_betting_manager() {
     BET_HANDLER.lock().unwrap().update_bet_hours(BRYAN_ID.to_string(), 10.0);
     BET_HANDLER.lock().unwrap().update_hour_change(BRYAN_ID.to_string(), 0.0);
     // Add Kwangwon
-    const KWANGWON_ID:&str  = "389916126626185216";
     BET_HANDLER.lock().unwrap().add_better(KWANGWON_ID.to_string());
     BET_HANDLER.lock().unwrap().add_relation(KWANGWON_ID.to_string(), "Kwangwon".to_string());
     BET_HANDLER.lock().unwrap().update_bet_hours(KWANGWON_ID.to_string(), 10.0);
@@ -89,7 +90,6 @@ impl EventHandler for Handler {
         tokio::spawn({
             let http = ctx.http.clone();
             let db_connection = self.db.clone();
-            //TODO Make is so that every new week there is speical logic that pings the debtors otherwise just write out the names
             async move {
                 loop {
                     // Run blocking DB logic in spawn_blocking
@@ -113,7 +113,6 @@ impl EventHandler for Handler {
 
     async fn message(&self, ctx: Context, msg: Message) {
         // Fetch the channel object
-        //TODO: message validation because you cannot trust the people who are going to use this bot
         if let Ok(channel) = msg.channel_id.to_channel(&ctx).await {
             if let serenity::model::channel::Channel::Guild(guild_channel) = channel {
                 if guild_channel.name == "tekken-tracker" && msg.content.starts_with("!bet") {
@@ -156,7 +155,7 @@ impl EventHandler for Handler {
                         .trim_start_matches('<')
                         .trim_end_matches('>')
                         .strip_prefix('@')
-                        .unwrap_or("Bad request"); 
+                        .unwrap_or("Bad request");
                     if BET_HANDLER.lock().unwrap().is_trusted(&cleaned) {
                         let db_connection = self.db.clone();
                         let parts: Vec<&str> = msg.content.split_whitespace().collect();
@@ -172,9 +171,10 @@ impl EventHandler for Handler {
                         } else if parsed_winner == "Bad request" {
                                 let _ = msg.channel_id.say(&ctx.http, "Invalid user entered, please try again".to_string()).await;
                         } else { 
-                            let resolution = BET_HANDLER.lock().unwrap().handle_bet_resolution(db_connection, ticket, parsed_winner.to_string());
-                            if resolution {
-                                let _ = msg.channel_id.say(&ctx.http, "Bet successfully resolved").await;
+                            let (winner_res, loser_res, amount_res) = BET_HANDLER.lock().unwrap().handle_bet_resolution(db_connection, ticket, parsed_winner.to_string());
+                            if winner_res != "Fake" {
+                                let message = format!("<@{}> has won the bet losing {} hours from their debt while <@{}> has lost and nobly takens on {} hours of tekken", winner_res, amount_res, loser_res, amount_res);
+                                let _ = msg.channel_id.say(&ctx.http, message).await;
                             }
                             else {
                                 let _ = msg.channel_id.say(&ctx.http, "Error :(").await;
@@ -202,6 +202,49 @@ impl EventHandler for Handler {
                     !list-bets - any user can use this command and it will show a list of the outstanding bets which include the users invovled as well as the bet number\n\
                     !debts - any user can use this command and it will show the users in the system who still have outstanding debt\n";
                     let _ = msg.channel_id.say(&http, message).await;
+                }
+                // The following functions are only intended for admin use and so will not be added to the help message
+                // For now admins can either add or remove members from the trusted list and I imagine changing bet hours
+                // may be necessary but would undermine trust in the bot. So at launch it will not
+                if guild_channel.name == "tekken-tracker" && msg.content.starts_with("!add-trusted") {
+                    let author = msg.author.to_string();
+                    let cleaned = author
+                        .trim_start_matches('<')
+                        .trim_end_matches('>')
+                        .strip_prefix('@')
+                        .unwrap_or("Bad request");
+                    if cleaned == BRANDON_ID || cleaned == KWANGWON_ID {
+                        let parts: Vec<&str> = msg.content.split_whitespace().collect();
+                        let winner = parts[1].to_string();
+                        let new_trusted = winner
+                            .trim_start_matches('<')
+                            .trim_end_matches('>')
+                            .strip_prefix('@')
+                            .unwrap_or("Bad request");
+                        let http = ctx.http.clone();
+                        let _ = BET_HANDLER.lock().unwrap().add_trusted(new_trusted.to_string());
+                        let _ = msg.channel_id.say(&http, "Added new member to trusted list").await;
+                    }
+                }
+                if guild_channel.name == "tekken-tracker" && msg.content.starts_with("!remove-trusted") {
+                    let author = msg.author.to_string();
+                    let cleaned = author
+                        .trim_start_matches('<')
+                        .trim_end_matches('>')
+                        .strip_prefix('@')
+                        .unwrap_or("Bad request");
+                    if cleaned == BRANDON_ID || cleaned == KWANGWON_ID {
+                        let parts: Vec<&str> = msg.content.split_whitespace().collect();
+                        let wizard = parts[1].to_string();
+                        let new_wizard = wizard
+                            .trim_start_matches('<')
+                            .trim_end_matches('>')
+                            .strip_prefix('@')
+                            .unwrap_or("Bad request");
+                        let http = ctx.http.clone();
+                        let _ = BET_HANDLER.lock().unwrap().remove_trusted(new_wizard);
+                        let _ = msg.channel_id.say(&http, "Removed member from the trusted list").await;
+                    }
                 }
             }
         }

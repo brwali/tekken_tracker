@@ -82,6 +82,9 @@ impl BetOverlord {
     pub fn add_trusted(&mut self, id: String) {
         self.trusted_users.insert(id);
     }
+    pub fn remove_trusted(&mut self, id: &str) {
+        self.trusted_users.remove(id);
+    }
     pub fn update_bet_hours(&mut self, id: String, hours: f32) {
         self.hours_available.insert(id, hours);
     }
@@ -116,14 +119,14 @@ impl BetOverlord {
         let bet_ticket: Bet = Bet::new(&id1, &id2, bet);
         self.counter += 1;
         self.bet_house.lock().unwrap().insert(ticket_no, bet_ticket);
-        let p1_hours = self.hours_available.get(&id1).unwrap() - bet;
-        let p2_hours = self.hours_available.get(&id2).unwrap() - bet;
+        let p1_hours = daily_task::round_after_math(self.hours_available.get(&id1).unwrap() - bet);
+        let p2_hours = daily_task::round_after_math(self.hours_available.get(&id2).unwrap() - bet);
         let _ = self.update_bet_hours(id1, p1_hours);
         let _ = self.update_bet_hours(id2, p2_hours);
         ticket_no
     }
 
-    pub fn handle_bet_resolution(&mut self, db: Arc<Mutex<Connection>>, ticket_no: i32, winner: String) -> bool {
+    pub fn handle_bet_resolution(&mut self, db: Arc<Mutex<Connection>>, ticket_no: i32, winner: String) -> (String, String, f32) {
         let ticket_after;
         {
             let mut binding = self.bet_house.lock().unwrap();
@@ -140,16 +143,19 @@ impl BetOverlord {
                 let user1 = ticket.get_user1();
                 let _ = db::bet_result(&db_connection, ticket.get_amount(), &user1);   
             } else {
-                return false;
+                return ("Fake".to_string(), "Fake".to_string(), -1.0);
             }
             let _ = binding.remove(&ticket_no);
         }
         self.update_hour_change(winner.clone(), ticket_after.get_amount() * -1.0);
+        let loser;
         if winner == ticket_after.get_user1() {
+            loser = ticket_after.get_user2();
             self.update_hour_change(ticket_after.get_user2().to_string(), ticket_after.get_amount());
         }else {
+            loser = ticket_after.get_user1();
             self.update_hour_change(ticket_after.get_user1().to_string(), ticket_after.get_amount());
         }
-        return true;
+        return (winner.to_string(), loser.to_string(), ticket_after.get_amount());
     }
 }

@@ -74,65 +74,71 @@ impl User {
 }
 
 pub fn init_db() -> Result<Connection> {
-    let conn = Connection::open_in_memory()?;
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS users (
-            id TEXT PRIMARY KEY,
-            name TEXT NOT NULL,
-            playtime FLOAT NOT NULL,
-            hours_owed FLOAT NOT NULL,
-            steam_id TEXT NOT NULL,
-            monthly_hours FLOAT NOT NULL,
-            bet_hours_available FLOAT NOT NULL
-        )",
-        [],
-    )?;
-    conn.execute(
-        "INSERT INTO users (id, name, playtime, hours_owed, steam_id, monthly_hours, bet_hours_available) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)", 
-        ("259508260082548747", "Jackson", 8.33, 20, "76561198012033309", 0.0, 0.0),
-    )?;
-    conn.execute(
-        "INSERT INTO users (id, name, playtime, hours_owed, steam_id, monthly_hours, bet_hours_available) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)", 
-        ("236622475612389377", "Mason", 14.55, 95, "76561198050141897", 0.0, 0.0),
-    )?;
-    conn.execute(
-        "INSERT INTO users (id, name, playtime, hours_owed, steam_id, monthly_hours, bet_hours_available) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)", 
-        ("489595366174490624", "Jonathan", 16.48, 150, "76561198368607001", 0.0, 0.0),
-    )?;
-    conn.execute(
-        "INSERT INTO users (id, name, playtime, hours_owed, steam_id, monthly_hours, bet_hours_available) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)", 
-        ("258772151585341440", "Logan", 35.05, 115, "76561198132296400", 0.0, 0.0),
-    )?;
-    conn.execute(
-        "INSERT INTO users (id, name, playtime, hours_owed, steam_id, monthly_hours, bet_hours_available) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)", 
-        ("451064565963161611", "Brandon", 66.1, 50, "76561198449736691", 0.0, 0.0),
-    )?;
-    conn.execute(
-        "INSERT INTO users (id, name, playtime, hours_owed, steam_id, monthly_hours, bet_hours_available) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)", 
-        ("303219081941614592", "Wyatt", 17.1, 15, "76561198141931951", 0.0, 0.0),
-    )?;
-    conn.execute(
-        "INSERT INTO users (id, name, playtime, hours_owed, steam_id, monthly_hours, bet_hours_available) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)", 
-        ("259826437022810112", "Bryan", 2, 2, "unknown", 0.0, 0.0),
-    )?;
-    conn.execute(
-        "INSERT INTO users (id, name, playtime, hours_owed, steam_id, monthly_hours, bet_hours_available) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)", 
-        ("389916126626185216", "Kwangwon", 2, 2, "unknown", 0.0, 0.0),
-    )?;
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS time (
-            id INTEGER PRIMARY KEY,
-            month INTEGER NOT NULL,
-            week INTEGER NOT NULL,
-            year INTEGER NOT NULL
-        )",
-        [],
-    )?;
-    // Make sure to check that this is right before deployment lol
-    conn.execute(
-        "INSERT INTO time (month, week, year) VALUES (?1, ?2, ?3)", 
-        (10, 7, 2025),
-    )?;
+    let conn = Connection::open("data.db")?;
+    {
+        let mut stmt = conn.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='users'")?;
+        let table_exists = stmt.exists([])?;
+        if !table_exists {
+            conn.execute(
+                "CREATE TABLE IF NOT EXISTS users (
+                    id TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    playtime FLOAT NOT NULL,
+                    hours_owed FLOAT NOT NULL,
+                    steam_id TEXT NOT NULL,
+                    monthly_hours FLOAT NOT NULL,
+                    bet_hours_available FLOAT NOT NULL
+                )",
+                [],
+            )?;
+            conn.execute(
+                "INSERT INTO users (id, name, playtime, hours_owed, steam_id, monthly_hours, bet_hours_available) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)", 
+                ("259508260082548747", "Jackson", 8.33, 20, "76561198012033309", 0.0, 0.0),
+            )?;
+            conn.execute(
+                "INSERT INTO users (id, name, playtime, hours_owed, steam_id, monthly_hours, bet_hours_available) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)", 
+                ("236622475612389377", "Mason", 14.55, 95, "76561198050141897", 0.0, 0.0),
+            )?;
+            conn.execute(
+                "INSERT INTO users (id, name, playtime, hours_owed, steam_id, monthly_hours, bet_hours_available) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)", 
+                ("489595366174490624", "Jonathan", 16.48, 150, "76561198368607001", 0.0, 0.0),
+            )?;
+            conn.execute(
+                "INSERT INTO users (id, name, playtime, hours_owed, steam_id, monthly_hours, bet_hours_available) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)", 
+                ("258772151585341440", "Logan", 35.05, 115, "76561198132296400", 0.0, 0.0),
+            )?;
+            conn.execute(
+                "INSERT INTO users (id, name, playtime, hours_owed, steam_id, monthly_hours, bet_hours_available) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)", 
+                ("451064565963161611", "Brandon", 66.1, 50, "76561198449736691", 0.0, 0.0),
+            )?;
+            conn.execute(
+                "INSERT INTO users (id, name, playtime, hours_owed, steam_id, monthly_hours, bet_hours_available) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)", 
+                ("303219081941614592", "Wyatt", 17.1, 15, "76561198141931951", 0.0, 0.0),
+            )?;
+            conn.execute(
+                "INSERT INTO users (id, name, playtime, hours_owed, steam_id, monthly_hours, bet_hours_available) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)", 
+                ("259826437022810112", "Bryan", 2, 2, "unknown", 0.0, 0.0),
+            )?;
+            conn.execute(
+                "INSERT INTO users (id, name, playtime, hours_owed, steam_id, monthly_hours, bet_hours_available) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)", 
+                ("389916126626185216", "Kwangwon", 2, 2, "unknown", 0.0, 0.0),
+            )?;
+            conn.execute(
+                "CREATE TABLE IF NOT EXISTS time (
+                    id INTEGER PRIMARY KEY,
+                    month INTEGER NOT NULL,
+                    week INTEGER NOT NULL,
+                    year INTEGER NOT NULL
+                )",
+                [],
+            )?;
+            // Make sure to check that this is right before deployment lol
+            conn.execute(
+                "INSERT INTO time (month, week, year) VALUES (?1, ?2, ?3)", 
+                (10, 7, 2025),
+            )?;
+        }
+    }
     Ok(conn)
 }
 
