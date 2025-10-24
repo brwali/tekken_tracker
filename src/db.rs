@@ -208,8 +208,8 @@ pub fn get_time(conn: &Connection) -> Result<Vec<Time>> {
 
 pub fn update_time(conn: &Connection, time: Time) -> rusqlite::Result<()> {
     conn.execute(
-        "UPDATE time SET month = ?, week = ?, year = ?",
-        params![time.month, time.week, time.year],
+        "UPDATE time SET month = ?, week = ?, year = ? WHERE id = ?",
+        params![time.month, time.week, time.year, time.id],
     )?;
     Ok(())
 }
