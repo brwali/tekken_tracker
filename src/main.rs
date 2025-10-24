@@ -25,41 +25,49 @@ fn setup_betting_manager() {
     BET_HANDLER.lock().unwrap().add_better(JACKSON_ID.to_string());
     BET_HANDLER.lock().unwrap().add_relation(JACKSON_ID.to_string(), "Jackson".to_string());
     BET_HANDLER.lock().unwrap().update_bet_hours(JACKSON_ID.to_string(), 10.0);
+    BET_HANDLER.lock().unwrap().update_hour_change(JACKSON_ID.to_string(), 0.0);
     // Add Mason
     const MASON_ID:&str  = "236622475612389377";
     BET_HANDLER.lock().unwrap().add_better(MASON_ID.to_string());
     BET_HANDLER.lock().unwrap().add_relation(MASON_ID.to_string(), "Mason".to_string());
     BET_HANDLER.lock().unwrap().update_bet_hours(MASON_ID.to_string(), 10.0);
+    BET_HANDLER.lock().unwrap().update_hour_change(MASON_ID.to_string(), 0.0);
     // Add Jonathan
     const JON_ID:&str  = "489595366174490624";
     BET_HANDLER.lock().unwrap().add_better(JON_ID.to_string());
     BET_HANDLER.lock().unwrap().add_relation(JON_ID.to_string(), "Jonathan".to_string());
     BET_HANDLER.lock().unwrap().update_bet_hours(JON_ID.to_string(), 10.0);
+    BET_HANDLER.lock().unwrap().update_hour_change(JON_ID.to_string(), 0.0);
     // Add Logan
     const LOGAN_ID:&str  = "258772151585341440";
     BET_HANDLER.lock().unwrap().add_better(LOGAN_ID.to_string());
     BET_HANDLER.lock().unwrap().add_relation(LOGAN_ID.to_string(), "Logan".to_string());
     BET_HANDLER.lock().unwrap().update_bet_hours(LOGAN_ID.to_string(), 10.0);
+    BET_HANDLER.lock().unwrap().update_hour_change(LOGAN_ID.to_string(), 0.0);
     // Add Brandon
     const BRANDON_ID:&str  = "451064565963161611";
     BET_HANDLER.lock().unwrap().add_better(BRANDON_ID.to_string());
     BET_HANDLER.lock().unwrap().add_relation(BRANDON_ID.to_string(), "Brandon".to_string());
     BET_HANDLER.lock().unwrap().update_bet_hours(BRANDON_ID.to_string(), 10.0);
+    BET_HANDLER.lock().unwrap().update_hour_change(BRANDON_ID.to_string(), 0.0);
     // Add Wyatt
     const WYATT_ID:&str  = "303219081941614592";
     BET_HANDLER.lock().unwrap().add_better(WYATT_ID.to_string());
     BET_HANDLER.lock().unwrap().add_relation(WYATT_ID.to_string(), "Wyatt".to_string());
     BET_HANDLER.lock().unwrap().update_bet_hours(WYATT_ID.to_string(), 10.0);
+    BET_HANDLER.lock().unwrap().update_hour_change(WYATT_ID.to_string(), 0.0);
     // Add Bryan
     const BRYAN_ID:&str  = "259826437022810112";
     BET_HANDLER.lock().unwrap().add_better(BRYAN_ID.to_string());
     BET_HANDLER.lock().unwrap().add_relation(BRYAN_ID.to_string(), "Bryan".to_string());
     BET_HANDLER.lock().unwrap().update_bet_hours(BRYAN_ID.to_string(), 10.0);
+    BET_HANDLER.lock().unwrap().update_hour_change(BRYAN_ID.to_string(), 0.0);
     // Add Kwangwon
     const KWANGWON_ID:&str  = "389916126626185216";
     BET_HANDLER.lock().unwrap().add_better(KWANGWON_ID.to_string());
     BET_HANDLER.lock().unwrap().add_relation(KWANGWON_ID.to_string(), "Kwangwon".to_string());
     BET_HANDLER.lock().unwrap().update_bet_hours(KWANGWON_ID.to_string(), 10.0);
+    BET_HANDLER.lock().unwrap().update_hour_change(KWANGWON_ID.to_string(), 0.0);
     //Now we need to add the trusted third party members\
     // Add Brandon
     BET_HANDLER.lock().unwrap().add_trusted(BRANDON_ID.to_string());
@@ -81,7 +89,7 @@ impl EventHandler for Handler {
         tokio::spawn({
             let http = ctx.http.clone();
             let db_connection = self.db.clone();
-
+            //TODO Make is so that every new week there is speical logic that pings the debtors otherwise just write out the names
             async move {
                 loop {
                     // Run blocking DB logic in spawn_blocking
@@ -119,18 +127,26 @@ impl EventHandler for Handler {
                         let parts: Vec<&str> = msg.content.split_whitespace().collect();
                         // the type is def wrong here for the bets argh
                         let bet_amount = parts[2].parse::<f32>().unwrap_or(-1.0);
-                        let bet_recp = parts[1].to_string();
-                        let parsed_bet_recp = bet_recp
-                            .trim_start_matches('<')
-                            .trim_end_matches('>')
-                            .strip_prefix('@')
-                            .unwrap_or("Bad request");
-                        if BET_HANDLER.lock().unwrap().can_bet(&parsed_bet_recp) && BET_HANDLER.lock().unwrap().hour_check(&cleaned, &parsed_bet_recp, bet_amount) {
-                            let ticket_no = BET_HANDLER.lock().unwrap().handle_bet_creation(cleaned.to_string(), parsed_bet_recp.to_string(), bet_amount);
-                            let _ = msg.channel_id.say(&ctx.http, format!("Bet successfully submitted, your bet number is {}\n",ticket_no.to_string())).await;
-                        }
-                        else {
-                            let _ = msg.channel_id.say(&ctx.http, "Error forming the ticket :/".to_string()).await;
+                        if bet_amount <= 0.0 || bet_amount > 10.0 {
+                            let _ = msg.channel_id.say(&ctx.http, "Incorrect bet value, please try again".to_string()).await;
+                        } else {
+                            let bet_recp = parts[1].to_string();
+                            let parsed_bet_recp = bet_recp
+                                .trim_start_matches('<')
+                                .trim_end_matches('>')
+                                .strip_prefix('@')
+                                .unwrap_or("Bad request");
+                            if cleaned == "Bad request" || parsed_bet_recp == "Bad request" {
+                                let _ = msg.channel_id.say(&ctx.http, "Invalid users entered, please try again".to_string()).await;
+                            } else {
+                                if BET_HANDLER.lock().unwrap().can_bet(&parsed_bet_recp) && BET_HANDLER.lock().unwrap().hour_check(&cleaned, &parsed_bet_recp, bet_amount) {
+                                    let ticket_no = BET_HANDLER.lock().unwrap().handle_bet_creation(cleaned.to_string(), parsed_bet_recp.to_string(), bet_amount);
+                                    let _ = msg.channel_id.say(&ctx.http, format!("Bet successfully submitted, your bet number is {}\n",ticket_no.to_string())).await;
+                                }
+                                else {
+                                    let _ = msg.channel_id.say(&ctx.http, "Error forming the ticket :/".to_string()).await;
+                                }
+                            }
                         }
                     }
                 }
@@ -151,27 +167,31 @@ impl EventHandler for Handler {
                             .strip_prefix('@')
                             .unwrap_or("Bad request"); 
                         let ticket = parts[2].parse::<i32>().unwrap_or(-1);
-                        let resolution = BET_HANDLER.lock().unwrap().handle_bet_resolution(db_connection, ticket, parsed_winner.to_string());
-                        if resolution {
-                            let _ = msg.channel_id.say(&ctx.http, "Bet successfully resolved").await;
-                        }
-                        else {
-                            println!("Error!!!");
+                        if ticket == -1 {
+                            let _ = msg.channel_id.say(&ctx.http, "Invalid bet number please try again").await;
+                        } else if parsed_winner == "Bad request" {
+                                let _ = msg.channel_id.say(&ctx.http, "Invalid user entered, please try again".to_string()).await;
+                        } else { 
+                            let resolution = BET_HANDLER.lock().unwrap().handle_bet_resolution(db_connection, ticket, parsed_winner.to_string());
+                            if resolution {
+                                let _ = msg.channel_id.say(&ctx.http, "Bet successfully resolved").await;
+                            }
+                            else {
+                                let _ = msg.channel_id.say(&ctx.http, "Error :(").await;
+                            }
                         }
                     }
                 }
                 if guild_channel.name == "tekken-tracker" && msg.content.starts_with("!list-bets") {
                     let http = ctx.http.clone();
                     let message = BET_HANDLER.lock().unwrap().list_bets();
-                    let channel_id = ChannelId::new(1404935148419682304);
-                    let _ = channel_id.say(&http, message).await;
+                    let _ = msg.channel_id.say(&http, message).await;
                 }
                 if guild_channel.name == "tekken-tracker" && msg.content.starts_with("!debts") {
                     let http = ctx.http.clone();
                     let db_connection = self.db.clone();
                     let message = daily_task::get_user_debts(db_connection);
-                    let channel_id = ChannelId::new(1404935148419682304);
-                    let _ = channel_id.say(&http, message).await;
+                    let _ = msg.channel_id.say(&http, message).await;
                 }
                 if guild_channel.name == "tekken-tracker" && msg.content.starts_with("!help") {
                     let http = ctx.http.clone();
@@ -181,8 +201,7 @@ impl EventHandler for Handler {
                     !winner [bet winner] [ticket number] - this command can only be used by trusted users to clear a bet, please provide the bet number that was given at the bet creation you wish to clear. If you do not remember use the command !list-bets\n\
                     !list-bets - any user can use this command and it will show a list of the outstanding bets which include the users invovled as well as the bet number\n\
                     !debts - any user can use this command and it will show the users in the system who still have outstanding debt\n";
-                    let channel_id = ChannelId::new(1404935148419682304);
-                    let _ = channel_id.say(&http, message).await;
+                    let _ = msg.channel_id.say(&http, message).await;
                 }
             }
         }

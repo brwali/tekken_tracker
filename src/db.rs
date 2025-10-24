@@ -56,9 +56,6 @@ impl User {
     pub fn get_monthly_hours(&self) -> f32 {
         self.monthly_hours
     }
-    pub fn get_bet_hours_available(&self) -> f32 {
-        self.bet_hours_available
-    }
     pub fn get_playtime(&self) -> f32 {
         self.playtime
     }
@@ -119,6 +116,10 @@ pub fn init_db() -> Result<Connection> {
         ("259826437022810112", "Bryan", 2, 2, "unknown", 0.0, 0.0),
     )?;
     conn.execute(
+        "INSERT INTO users (id, name, playtime, hours_owed, steam_id, monthly_hours, bet_hours_available) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)", 
+        ("389916126626185216", "Kwangwon", 2, 2, "unknown", 0.0, 0.0),
+    )?;
+    conn.execute(
         "CREATE TABLE IF NOT EXISTS time (
             id INTEGER PRIMARY KEY,
             month INTEGER NOT NULL,
@@ -130,7 +131,7 @@ pub fn init_db() -> Result<Connection> {
     // Make sure to check that this is right before deployment lol
     conn.execute(
         "INSERT INTO time (month, week, year) VALUES (?1, ?2, ?3)", 
-        (10, 3, 2025),
+        (10, 7, 2025),
     )?;
     Ok(conn)
 }

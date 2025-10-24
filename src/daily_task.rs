@@ -65,6 +65,7 @@ async fn update_debt_hours(db: Arc<Mutex<Connection>>, bet_handler:&mut BetOverl
                 let hours = user.get_playtime();
                 let total_hours = user.get_hours_owed();
                 let steam_id = user.get_steamid().to_string();
+                let birth_name = user.get_name().to_string();
                 let mut playtime_outer = hours;
                 if hours < total_hours {
                     let request = format!(
@@ -96,19 +97,30 @@ async fn update_debt_hours(db: Arc<Mutex<Connection>>, bet_handler:&mut BetOverl
                     }
                     let hours_left =  total_hours - hours;
                     if hours == playtime_outer {
-                        message.push_str(&format!("<@{}> has played {} hours and has {} hours left to go!\nThey have played ZERO tekken hours within the last 24 hours :(\n", name, hours, hours_left));
+                        if new_week {
+                            message.push_str(&format!("<@{}> has played {} hours and has {} hours left to go!\nThey have played ZERO tekken hours within the last 24 hours :(\n", name, hours, hours_left));
+                        }
+                        else {
+                            message.push_str(&format!("{} has played {} hours and has {} hours left to go!\nThey have played ZERO tekken hours within the last 24 hours :(\n\n", birth_name, hours, hours_left));
+                        }
                     }
                     else {
-                        user.set_hours_owed(playtime_outer);
-                        message.push_str(&format!("<@{}> has played {} hours and has {} hours left to go!\nThey have played {} tekken hours since last time, way to go :D!!!\n", name, playtime_outer, hours_left, playtime_outer - hours));
+                        user.set_playtime(playtime_outer);
+                        if new_week {
+                            message.push_str(&format!("<@{}> has played {} hours and has {} hours left to go!\nThey have played {} tekken hours since last time, way to go :D!!!\n", name, playtime_outer, hours_left, playtime_outer - hours));
+                        }
+                        else {
+                            message.push_str(&format!("{} has played {} hours and has {} hours left to go!\nThey have played {} tekken hours since last time, way to go :D!!!\n\n", birth_name, playtime_outer, hours_left, playtime_outer - hours));
+                        }
                     }
                     // If its a new month and we need to see if interest should be added
                     if new_month {
                         let monthy_hours = user.get_monthly_hours();
                         if monthy_hours < 5.0 {
                             playtime_outer = hours_left + (hours_left * 0.05);
+                            playtime_outer = round_after_math(playtime_outer);
                             user.set_hours_owed(playtime_outer);
-                            message.push_str(&format!("<@{}> has not played their 5 monthly tekken hours and has incurred the 5% interest penalty. They now owe {} more hours D:", name, (hours_left*0.05)));
+                            message.push_str(&format!("<@{}> has not played their 5 monthly tekken hours and has incurred the 5% interest penalty. They now owe {} more hours D:\n", name, (hours_left*0.05)));
                         }
                         // reset monthly play counter
                         user.set_monthly_hours(0.0);
@@ -116,8 +128,22 @@ async fn update_debt_hours(db: Arc<Mutex<Connection>>, bet_handler:&mut BetOverl
                 }
                 // Check to see if its a new week and if so reset available betting hours
                 if new_week {
+                    let mut hours_earned = bet_handler.get_hours_change(&name);
+                    let change;
+                    if hours_earned > 0.0 {
+                        change = "gained";
+                    } else {
+                        hours_earned = hours_earned * -1.0;
+                        change = "lost";
+                    };
+                    if hours_earned == 0.0 {
+                        message.push_str(&format!("This week {} has not engaged in any bets.\n\n", birth_name));
+                    } else {
+                        message.push_str(&format!("This week {} has {} {} hours through bets.\n\n", birth_name, change, hours_earned));
+                    }
                     bet_handler.update_bet_hours(name.to_string(), 0.0);
                     user.set_bet_hours_available(0.0);
+                    bet_handler.update_hour_change(name, 0.0);
                 }
                 else {
                     user.set_bet_hours_available(bet_handler.get_bet_hours(&name));
@@ -158,4 +184,8 @@ pub fn get_user_debts(db: Arc<Mutex<Connection>>) -> String {
         }
     }
     message
+}
+
+pub fn round_after_math(val: f32) -> f32 {
+    (val * 100.0).trunc() / 100.0
 }
