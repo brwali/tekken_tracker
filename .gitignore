@@ -21,6 +21,7 @@ target
 #.idea/
 .env
 *.csv
+*.db
 
 
 # Added by cargo
