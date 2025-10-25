@@ -18,66 +18,66 @@ static BET_HANDLER: Lazy<Mutex<bet::BetOverlord>> = Lazy::new(|| {
     Mutex::new(bet::BetOverlord::new())
 });
 
-const BRANDON_ID:&str  = "451064565963161611";
-const KWANGWON_ID:&str  = "389916126626185216";
 
 fn setup_betting_manager() {
+    let brandon_id:&str = &format!("{}", env::var("BRANDON_ID").unwrap());
+    let kwangwon_id:&str = &format!("{}", env::var("KWANGWON_ID").unwrap());
     // First we need to add the people who can bet
     // Add Jackson
-    const JACKSON_ID:&str = "259508260082548747";
-    BET_HANDLER.lock().unwrap().add_better(JACKSON_ID.to_string());
-    BET_HANDLER.lock().unwrap().add_relation(JACKSON_ID.to_string(), "Jackson".to_string());
-    BET_HANDLER.lock().unwrap().update_bet_hours(JACKSON_ID.to_string(), 10.0);
-    BET_HANDLER.lock().unwrap().update_hour_change(JACKSON_ID.to_string(), 0.0);
+    let jackson_id:&str = &format!("{}", env::var("JACKSON_ID").unwrap());
+    BET_HANDLER.lock().unwrap().add_better(jackson_id.to_string());
+    BET_HANDLER.lock().unwrap().add_relation(jackson_id.to_string(), "Jackson".to_string());
+    BET_HANDLER.lock().unwrap().update_bet_hours(jackson_id.to_string(), 10.0);
+    BET_HANDLER.lock().unwrap().update_hour_change(jackson_id.to_string(), 0.0);
     // Add Mason
-    const MASON_ID:&str  = "236622475612389377";
-    BET_HANDLER.lock().unwrap().add_better(MASON_ID.to_string());
-    BET_HANDLER.lock().unwrap().add_relation(MASON_ID.to_string(), "Mason".to_string());
-    BET_HANDLER.lock().unwrap().update_bet_hours(MASON_ID.to_string(), 10.0);
-    BET_HANDLER.lock().unwrap().update_hour_change(MASON_ID.to_string(), 0.0);
+    let mason_id:&str = &format!("{}", env::var("MASON_ID").unwrap());
+    BET_HANDLER.lock().unwrap().add_better(mason_id.to_string());
+    BET_HANDLER.lock().unwrap().add_relation(mason_id.to_string(), "Mason".to_string());
+    BET_HANDLER.lock().unwrap().update_bet_hours(mason_id.to_string(), 10.0);
+    BET_HANDLER.lock().unwrap().update_hour_change(mason_id.to_string(), 0.0);
     // Add Jonathan
-    const JON_ID:&str  = "489595366174490624";
-    BET_HANDLER.lock().unwrap().add_better(JON_ID.to_string());
-    BET_HANDLER.lock().unwrap().add_relation(JON_ID.to_string(), "Jonathan".to_string());
-    BET_HANDLER.lock().unwrap().update_bet_hours(JON_ID.to_string(), 10.0);
-    BET_HANDLER.lock().unwrap().update_hour_change(JON_ID.to_string(), 0.0);
+    let jon_id:&str = &format!("{}", env::var("JON_ID").unwrap());
+    BET_HANDLER.lock().unwrap().add_better(jon_id.to_string());
+    BET_HANDLER.lock().unwrap().add_relation(jon_id.to_string(), "Jonathan".to_string());
+    BET_HANDLER.lock().unwrap().update_bet_hours(jon_id.to_string(), 10.0);
+    BET_HANDLER.lock().unwrap().update_hour_change(jon_id.to_string(), 0.0);
     // Add Logan
-    const LOGAN_ID:&str  = "258772151585341440";
-    BET_HANDLER.lock().unwrap().add_better(LOGAN_ID.to_string());
-    BET_HANDLER.lock().unwrap().add_relation(LOGAN_ID.to_string(), "Logan".to_string());
-    BET_HANDLER.lock().unwrap().update_bet_hours(LOGAN_ID.to_string(), 10.0);
-    BET_HANDLER.lock().unwrap().update_hour_change(LOGAN_ID.to_string(), 0.0);
+    let logan_id:&str = &format!("{}", env::var("LOGAN_ID").unwrap());
+    BET_HANDLER.lock().unwrap().add_better(logan_id.to_string());
+    BET_HANDLER.lock().unwrap().add_relation(logan_id.to_string(), "Logan".to_string());
+    BET_HANDLER.lock().unwrap().update_bet_hours(logan_id.to_string(), 10.0);
+    BET_HANDLER.lock().unwrap().update_hour_change(logan_id.to_string(), 0.0);
     // Add Brandon
-    BET_HANDLER.lock().unwrap().add_better(BRANDON_ID.to_string());
-    BET_HANDLER.lock().unwrap().add_relation(BRANDON_ID.to_string(), "Brandon".to_string());
-    BET_HANDLER.lock().unwrap().update_bet_hours(BRANDON_ID.to_string(), 10.0);
-    BET_HANDLER.lock().unwrap().update_hour_change(BRANDON_ID.to_string(), 0.0);
+    BET_HANDLER.lock().unwrap().add_better(brandon_id.to_string());
+    BET_HANDLER.lock().unwrap().add_relation(brandon_id.to_string(), "Brandon".to_string());
+    BET_HANDLER.lock().unwrap().update_bet_hours(brandon_id.to_string(), 10.0);
+    BET_HANDLER.lock().unwrap().update_hour_change(brandon_id.to_string(), 0.0);
     // Add Wyatt
-    const WYATT_ID:&str  = "303219081941614592";
-    BET_HANDLER.lock().unwrap().add_better(WYATT_ID.to_string());
-    BET_HANDLER.lock().unwrap().add_relation(WYATT_ID.to_string(), "Wyatt".to_string());
-    BET_HANDLER.lock().unwrap().update_bet_hours(WYATT_ID.to_string(), 10.0);
-    BET_HANDLER.lock().unwrap().update_hour_change(WYATT_ID.to_string(), 0.0);
+    let wyatt_id:&str = &format!("{}", env::var("WYATT_ID").unwrap());
+    BET_HANDLER.lock().unwrap().add_better(wyatt_id.to_string());
+    BET_HANDLER.lock().unwrap().add_relation(wyatt_id.to_string(), "Wyatt".to_string());
+    BET_HANDLER.lock().unwrap().update_bet_hours(wyatt_id.to_string(), 10.0);
+    BET_HANDLER.lock().unwrap().update_hour_change(wyatt_id.to_string(), 0.0);
     // Add Bryan
-    const BRYAN_ID:&str  = "259826437022810112";
-    BET_HANDLER.lock().unwrap().add_better(BRYAN_ID.to_string());
-    BET_HANDLER.lock().unwrap().add_relation(BRYAN_ID.to_string(), "Bryan".to_string());
-    BET_HANDLER.lock().unwrap().update_bet_hours(BRYAN_ID.to_string(), 10.0);
-    BET_HANDLER.lock().unwrap().update_hour_change(BRYAN_ID.to_string(), 0.0);
+    let bryan_id:&str = &format!("{}", env::var("BRYAN_ID").unwrap());
+    BET_HANDLER.lock().unwrap().add_better(bryan_id.to_string());
+    BET_HANDLER.lock().unwrap().add_relation(bryan_id.to_string(), "Bryan".to_string());
+    BET_HANDLER.lock().unwrap().update_bet_hours(bryan_id.to_string(), 10.0);
+    BET_HANDLER.lock().unwrap().update_hour_change(bryan_id.to_string(), 0.0);
     // Add Kwangwon
-    BET_HANDLER.lock().unwrap().add_better(KWANGWON_ID.to_string());
-    BET_HANDLER.lock().unwrap().add_relation(KWANGWON_ID.to_string(), "Kwangwon".to_string());
-    BET_HANDLER.lock().unwrap().update_bet_hours(KWANGWON_ID.to_string(), 10.0);
-    BET_HANDLER.lock().unwrap().update_hour_change(KWANGWON_ID.to_string(), 0.0);
+    BET_HANDLER.lock().unwrap().add_better(kwangwon_id.to_string());
+    BET_HANDLER.lock().unwrap().add_relation(kwangwon_id.to_string(), "Kwangwon".to_string());
+    BET_HANDLER.lock().unwrap().update_bet_hours(kwangwon_id.to_string(), 10.0);
+    BET_HANDLER.lock().unwrap().update_hour_change(kwangwon_id.to_string(), 0.0);
     //Now we need to add the trusted third party members\
     // Add Brandon
-    BET_HANDLER.lock().unwrap().add_trusted(BRANDON_ID.to_string());
+    BET_HANDLER.lock().unwrap().add_trusted(brandon_id.to_string());
     // Add Kwangwon
-    BET_HANDLER.lock().unwrap().add_trusted(KWANGWON_ID.to_string());
+    BET_HANDLER.lock().unwrap().add_trusted(kwangwon_id.to_string());
     // Add Daniel
-    const DANIEL_ID:&str  = "230147129492897794";
-    BET_HANDLER.lock().unwrap().add_trusted(DANIEL_ID.to_string());
-    BET_HANDLER.lock().unwrap().add_relation(DANIEL_ID.to_string(), "Daniel".to_string());
+    let daniel_id:&str = &format!("{}", env::var("DANIEL_ID").unwrap_or("".to_string()));
+    BET_HANDLER.lock().unwrap().add_trusted(daniel_id.to_string());
+    BET_HANDLER.lock().unwrap().add_relation(daniel_id.to_string(), "Daniel".to_string());
 }
 
 #[serenity::async_trait]
@@ -206,6 +206,8 @@ impl EventHandler for Handler {
                 // The following functions are only intended for admin use and so will not be added to the help message
                 // For now admins can either add or remove members from the trusted list and I imagine changing bet hours
                 // may be necessary but would undermine trust in the bot. So at launch it will not
+                let brandon_id:&str = &format!("{}", env::var("BRANDON_ID").unwrap());
+                let kwangwon_id:&str = &format!("{}", env::var("KWANGWON_ID").unwrap());
                 if guild_channel.name == "tekken-tracker" && msg.content.starts_with("!add-trusted") {
                     let author = msg.author.to_string();
                     let cleaned = author
@@ -213,7 +215,7 @@ impl EventHandler for Handler {
                         .trim_end_matches('>')
                         .strip_prefix('@')
                         .unwrap_or("Bad request");
-                    if cleaned == BRANDON_ID || cleaned == KWANGWON_ID {
+                    if cleaned == brandon_id || cleaned == kwangwon_id {
                         let parts: Vec<&str> = msg.content.split_whitespace().collect();
                         let winner = parts[1].to_string();
                         let new_trusted = winner
@@ -233,7 +235,7 @@ impl EventHandler for Handler {
                         .trim_end_matches('>')
                         .strip_prefix('@')
                         .unwrap_or("Bad request");
-                    if cleaned == BRANDON_ID || cleaned == KWANGWON_ID {
+                    if cleaned == brandon_id || cleaned == kwangwon_id {
                         let parts: Vec<&str> = msg.content.split_whitespace().collect();
                         let wizard = parts[1].to_string();
                         let new_wizard = wizard

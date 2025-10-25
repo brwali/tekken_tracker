@@ -1,4 +1,5 @@
 use rusqlite::{Connection, Result, params};
+use std::env;
 
 #[derive(Clone)]
 pub struct User {
@@ -93,35 +94,35 @@ pub fn init_db() -> Result<Connection> {
             )?;
             conn.execute(
                 "INSERT INTO users (id, name, playtime, hours_owed, steam_id, monthly_hours, bet_hours_available) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)", 
-                ("259508260082548747", "Jackson", 8.33, 20, "76561198012033309", 0.0, 0.0),
+                (&format!("{}", env::var("JACKSON_ID").unwrap()), "Jackson", 8.33, 20, &format!("{}", env::var("JACKSON_STEAM_ID").unwrap()), 0.0, 0.0),
             )?;
             conn.execute(
                 "INSERT INTO users (id, name, playtime, hours_owed, steam_id, monthly_hours, bet_hours_available) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)", 
-                ("236622475612389377", "Mason", 14.55, 95, "76561198050141897", 0.0, 0.0),
+                (&format!("{}", env::var("MASON_ID").unwrap()), "Mason", 14.55, 95, &format!("{}", env::var("MASON_STEAM_ID").unwrap()), 0.0, 0.0),
             )?;
             conn.execute(
                 "INSERT INTO users (id, name, playtime, hours_owed, steam_id, monthly_hours, bet_hours_available) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)", 
-                ("489595366174490624", "Jonathan", 16.48, 150, "76561198368607001", 0.0, 0.0),
+                (&format!("{}", env::var("JON_ID").unwrap()), "Jonathan", 16.48, 150, &format!("{}", env::var("JON_STEAM_ID").unwrap()), 0.0, 0.0),
             )?;
             conn.execute(
                 "INSERT INTO users (id, name, playtime, hours_owed, steam_id, monthly_hours, bet_hours_available) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)", 
-                ("258772151585341440", "Logan", 35.05, 115, "76561198132296400", 0.0, 0.0),
+                (&format!("{}", env::var("LOGAN_ID").unwrap()), "Logan", 35.05, 115, &format!("{}", env::var("LOGAN_STEAM_ID").unwrap()), 0.0, 0.0),
             )?;
             conn.execute(
                 "INSERT INTO users (id, name, playtime, hours_owed, steam_id, monthly_hours, bet_hours_available) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)", 
-                ("451064565963161611", "Brandon", 66.1, 50, "76561198449736691", 0.0, 0.0),
+                (&format!("{}", env::var("BRANDON_ID").unwrap()), "Brandon", 66.1, 50, &format!("{}", env::var("BRANDON_STEAM_ID").unwrap()), 0.0, 0.0),
             )?;
             conn.execute(
                 "INSERT INTO users (id, name, playtime, hours_owed, steam_id, monthly_hours, bet_hours_available) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)", 
-                ("303219081941614592", "Wyatt", 17.1, 15, "76561198141931951", 0.0, 0.0),
+                (&format!("{}", env::var("WYATT_ID").unwrap()), "Wyatt", 17.1, 15, &format!("{}", env::var("WYATT_STEAM_ID").unwrap()), 0.0, 0.0),
             )?;
             conn.execute(
                 "INSERT INTO users (id, name, playtime, hours_owed, steam_id, monthly_hours, bet_hours_available) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)", 
-                ("259826437022810112", "Bryan", 2, 2, "unknown", 0.0, 0.0),
+                (&format!("{}", env::var("BRYAN_ID").unwrap()), "Bryan", 2, 2, &format!("{}", env::var("BRYAN_STEAM_ID").unwrap()), 0.0, 0.0),
             )?;
             conn.execute(
                 "INSERT INTO users (id, name, playtime, hours_owed, steam_id, monthly_hours, bet_hours_available) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)", 
-                ("389916126626185216", "Kwangwon", 2, 2, "unknown", 0.0, 0.0),
+                (&format!("{}", env::var("KWANGWON_ID").unwrap()), "Kwangwon", 2, 2, &format!("{}", env::var("KWANGWON_ID").unwrap()), 0.0, 0.0),
             )?;
             conn.execute(
                 "CREATE TABLE IF NOT EXISTS time (
