@@ -182,7 +182,7 @@ impl EventHandler for Handler {
                         }
                     }
                 }
-                if guild_channel.name == "tekken-tracker" && msg.content.starts_with("!cancel") {
+                if guild_channel.name == "tekken-tracker" && msg.content.starts_with("!cancel-bet") {
                     let author = msg.author.to_string();
                     let cleaned = author
                         .trim_start_matches('<')
@@ -223,7 +223,7 @@ impl EventHandler for Handler {
                     Commands:\n\
                     !bet [bet receiever] [hours bet] - only users who are registered in the system can place bets. If you try to place a bet with a higher hour amount than either player can bet, the bot will reject the creation of the bet.\n\
                     !winner [bet winner] [bet number] - this command can only be used by trusted users to clear a bet, please provide the bet number that was given at the bet creation you wish to clear. If you do not remember use the command !list-bets\n\
-                    !cancel [bet number] - this command can only be used by trusted users to cancel a bet, please provide the bet number to remove the bet from the outstanding bets which will also refund each player their bet hours. If you do not remember use the command !list-bets\n\
+                    !cancel-bet [bet number] - this command can only be used by trusted users to cancel a bet, please provide the bet number to remove the bet from the outstanding bets which will also refund each player their bet hours. If you do not remember use the command !list-bets\n\
                     !list-bets - any user can use this command and it will show a list of the outstanding bets which include the users invovled as well as the bet number\n\
                     !debts - any user can use this command and it will show the users in the system who still have outstanding debt\n";
                     let _ = msg.channel_id.say(&http, message).await;
