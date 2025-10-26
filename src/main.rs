@@ -121,7 +121,7 @@ impl EventHandler for Handler {
                         .trim_start_matches('<')
                         .trim_end_matches('>')
                         .strip_prefix('@')
-                        .unwrap_or("Bad request"); 
+                        .unwrap_or("Bad request");
                     if BET_HANDLER.lock().unwrap().can_bet(&cleaned) {
                         let parts: Vec<&str> = msg.content.split_whitespace().collect();
                         // the type is def wrong here for the bets argh
@@ -164,16 +164,40 @@ impl EventHandler for Handler {
                             .trim_start_matches('<')
                             .trim_end_matches('>')
                             .strip_prefix('@')
-                            .unwrap_or("Bad request"); 
+                            .unwrap_or("Bad request");
                         let ticket = parts[2].parse::<i32>().unwrap_or(-1);
                         if ticket == -1 {
                             let _ = msg.channel_id.say(&ctx.http, "Invalid bet number please try again").await;
                         } else if parsed_winner == "Bad request" {
                                 let _ = msg.channel_id.say(&ctx.http, "Invalid user entered, please try again".to_string()).await;
-                        } else { 
+                        } else {
                             let (winner_res, loser_res, amount_res) = BET_HANDLER.lock().unwrap().handle_bet_resolution(db_connection, ticket, parsed_winner.to_string());
                             if winner_res != "Fake" {
                                 let message = format!("<@{}> has won the bet losing {} hours from their debt while <@{}> has lost and nobly takens on {} hours of tekken", winner_res, amount_res, loser_res, amount_res);
+                                let _ = msg.channel_id.say(&ctx.http, message).await;
+                            }
+                            else {
+                                let _ = msg.channel_id.say(&ctx.http, "Error :(").await;
+                            }
+                        }
+                    }
+                }
+                if guild_channel.name == "tekken-tracker" && msg.content.starts_with("!cancel-bet") {
+                    let author = msg.author.to_string();
+                    let cleaned = author
+                        .trim_start_matches('<')
+                        .trim_end_matches('>')
+                        .strip_prefix('@')
+                        .unwrap_or("Bad request");
+                    if BET_HANDLER.lock().unwrap().is_trusted(&cleaned) {
+                        let parts: Vec<&str> = msg.content.split_whitespace().collect();
+                        let ticket = parts[1].parse::<i32>().unwrap_or(-1);
+                        if ticket == -1 {
+                            let _ = msg.channel_id.say(&ctx.http, "Invalid bet number please try again").await;
+                        } else {
+                            let amount = BET_HANDLER.lock().unwrap().cancel_bet(ticket);
+                            if amount > 0.0 {
+                                let message = format!("Bet number {} has been removed and both debtors have recieved a bet refund of {} hours", ticket, amount);
                                 let _ = msg.channel_id.say(&ctx.http, message).await;
                             }
                             else {
@@ -198,7 +222,8 @@ impl EventHandler for Handler {
                     let message = "Reminder for the commands !bet and !winner please @ the user who you are trying to initiate/resolve the bet for\n\
                     Commands:\n\
                     !bet [bet receiever] [hours bet] - only users who are registered in the system can place bets. If you try to place a bet with a higher hour amount than either player can bet, the bot will reject the creation of the bet.\n\
-                    !winner [bet winner] [ticket number] - this command can only be used by trusted users to clear a bet, please provide the bet number that was given at the bet creation you wish to clear. If you do not remember use the command !list-bets\n\
+                    !winner [bet winner] [bet number] - this command can only be used by trusted users to clear a bet, please provide the bet number that was given at the bet creation you wish to clear. If you do not remember use the command !list-bets\n\
+                    !cancel-bet [bet number] - this command can only be used by trusted users to cancel a bet, please provide the bet number to remove the bet from the outstanding bets which will also refund each player their bet hours. If you do not remember use the command !list-bets\n\
                     !list-bets - any user can use this command and it will show a list of the outstanding bets which include the users invovled as well as the bet number\n\
                     !debts - any user can use this command and it will show the users in the system who still have outstanding debt\n";
                     let _ = msg.channel_id.say(&http, message).await;
