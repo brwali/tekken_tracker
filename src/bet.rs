@@ -126,6 +126,24 @@ impl BetOverlord {
         ticket_no
     }
 
+    pub fn cancel_bet(&mut self, ticket_no: i32) -> f32 {
+        let ticket_after;
+        {
+            let mut binding = self.bet_house.lock().unwrap();
+            let ticket = binding.get(&ticket_no).unwrap();
+            ticket_after = ticket.clone();
+            let _ = binding.remove(&ticket_no);
+        }
+        let amount = ticket_after.get_amount();
+        let id1 = ticket_after.get_user1().to_string();
+        let id2 = ticket_after.get_user2().to_string();
+        let p1_hours = daily_task::round_after_math(self.hours_available.get(&id1).unwrap() + amount);
+        let p2_hours = daily_task::round_after_math(self.hours_available.get(&id2).unwrap() + amount);
+        let _ = self.update_bet_hours(id1, p1_hours);
+        let _ = self.update_bet_hours(id2, p2_hours);
+        amount
+    }
+
     pub fn handle_bet_resolution(&mut self, db: Arc<Mutex<Connection>>, ticket_no: i32, winner: String) -> (String, String, f32) {
         let ticket_after;
         {
@@ -141,7 +159,7 @@ impl BetOverlord {
             } else if winner == ticket.get_user2() {
                 let _ = db::bet_result(&db_connection, ticket.get_amount() * -1.0, &winner);
                 let user1 = ticket.get_user1();
-                let _ = db::bet_result(&db_connection, ticket.get_amount(), &user1);   
+                let _ = db::bet_result(&db_connection, ticket.get_amount(), &user1);
             } else {
                 return ("Fake".to_string(), "Fake".to_string(), -1.0);
             }

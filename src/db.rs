@@ -93,35 +93,35 @@ pub fn init_db() -> Result<Connection> {
                 [],
             )?;
             conn.execute(
-                "INSERT INTO users (id, name, playtime, hours_owed, steam_id, monthly_hours, bet_hours_available) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)", 
+                "INSERT INTO users (id, name, playtime, hours_owed, steam_id, monthly_hours, bet_hours_available) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
                 (&format!("{}", env::var("JACKSON_ID").unwrap()), "Jackson", 8.33, 20, &format!("{}", env::var("JACKSON_STEAM_ID").unwrap()), 0.0, 0.0),
             )?;
             conn.execute(
-                "INSERT INTO users (id, name, playtime, hours_owed, steam_id, monthly_hours, bet_hours_available) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)", 
+                "INSERT INTO users (id, name, playtime, hours_owed, steam_id, monthly_hours, bet_hours_available) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
                 (&format!("{}", env::var("MASON_ID").unwrap()), "Mason", 14.55, 95, &format!("{}", env::var("MASON_STEAM_ID").unwrap()), 0.0, 0.0),
             )?;
             conn.execute(
-                "INSERT INTO users (id, name, playtime, hours_owed, steam_id, monthly_hours, bet_hours_available) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)", 
+                "INSERT INTO users (id, name, playtime, hours_owed, steam_id, monthly_hours, bet_hours_available) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
                 (&format!("{}", env::var("JON_ID").unwrap()), "Jonathan", 16.48, 150, &format!("{}", env::var("JON_STEAM_ID").unwrap()), 0.0, 0.0),
             )?;
             conn.execute(
-                "INSERT INTO users (id, name, playtime, hours_owed, steam_id, monthly_hours, bet_hours_available) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)", 
+                "INSERT INTO users (id, name, playtime, hours_owed, steam_id, monthly_hours, bet_hours_available) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
                 (&format!("{}", env::var("LOGAN_ID").unwrap()), "Logan", 35.05, 115, &format!("{}", env::var("LOGAN_STEAM_ID").unwrap()), 0.0, 0.0),
             )?;
             conn.execute(
-                "INSERT INTO users (id, name, playtime, hours_owed, steam_id, monthly_hours, bet_hours_available) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)", 
+                "INSERT INTO users (id, name, playtime, hours_owed, steam_id, monthly_hours, bet_hours_available) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
                 (&format!("{}", env::var("BRANDON_ID").unwrap()), "Brandon", 66.1, 50, &format!("{}", env::var("BRANDON_STEAM_ID").unwrap()), 0.0, 0.0),
             )?;
             conn.execute(
-                "INSERT INTO users (id, name, playtime, hours_owed, steam_id, monthly_hours, bet_hours_available) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)", 
+                "INSERT INTO users (id, name, playtime, hours_owed, steam_id, monthly_hours, bet_hours_available) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
                 (&format!("{}", env::var("WYATT_ID").unwrap()), "Wyatt", 17.1, 15, &format!("{}", env::var("WYATT_STEAM_ID").unwrap()), 0.0, 0.0),
             )?;
             conn.execute(
-                "INSERT INTO users (id, name, playtime, hours_owed, steam_id, monthly_hours, bet_hours_available) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)", 
+                "INSERT INTO users (id, name, playtime, hours_owed, steam_id, monthly_hours, bet_hours_available) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
                 (&format!("{}", env::var("BRYAN_ID").unwrap()), "Bryan", 2, 2, &format!("{}", env::var("BRYAN_STEAM_ID").unwrap()), 0.0, 0.0),
             )?;
             conn.execute(
-                "INSERT INTO users (id, name, playtime, hours_owed, steam_id, monthly_hours, bet_hours_available) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)", 
+                "INSERT INTO users (id, name, playtime, hours_owed, steam_id, monthly_hours, bet_hours_available) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
                 (&format!("{}", env::var("KWANGWON_ID").unwrap()), "Kwangwon", 2, 2, &format!("{}", env::var("KWANGWON_ID").unwrap()), 0.0, 0.0),
             )?;
             conn.execute(
@@ -135,7 +135,7 @@ pub fn init_db() -> Result<Connection> {
             )?;
             // Make sure to check that this is right before deployment lol
             conn.execute(
-                "INSERT INTO time (month, week, year) VALUES (?1, ?2, ?3)", 
+                "INSERT INTO time (month, week, year) VALUES (?1, ?2, ?3)",
                 (10, 7, 2025),
             )?;
         }
