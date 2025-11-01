@@ -207,6 +207,19 @@ pub fn get_time(conn: &Connection) -> Result<Vec<Time>> {
     time_wizard
 }
 
+pub fn get_monthly_hours(conn: &Connection, id: &str) -> Result<Option<f32>> {
+    let mut statement = conn.prepare("SELECT monthly_hours FROM users WHERE id = ?1")?;
+
+    let mut rows = statement.query(params![id])?;
+
+    if let Some(row) = rows.next()? {
+        let monthly_hours: f32 = row.get(0)?;
+        Ok(Some(monthly_hours))
+    } else {
+        Ok(None)
+    }
+}
+
 pub fn update_time(conn: &Connection, time: Time) -> rusqlite::Result<()> {
     conn.execute(
         "UPDATE time SET month = ?, week = ?, year = ? WHERE id = ?",

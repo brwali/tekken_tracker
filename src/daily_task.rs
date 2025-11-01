@@ -95,22 +95,23 @@ async fn update_debt_hours(db: Arc<Mutex<Connection>>, bet_handler:&mut BetOverl
                             println!("No games found in response.");
                         }
                     }
-                    let hours_left =  total_hours - hours;
+                    let hours_left = round_after_math(total_hours - playtime_outer);
+                    let daily_playtime = round_after_math(playtime_outer - hours);
                     if hours == playtime_outer {
                         if new_week {
-                            message.push_str(&format!("<@{}> has played {} hours and has {} hours left to go!\nThey have played ZERO tekken hours within the last 24 hours :(\n", name, hours, hours_left));
+                            message.push_str(&format!("<@{}> has played {} hours and has {} hours left to go!\nThey have played ZERO tekken hours within the last 24 hours :(\n", name, playtime_outer, hours_left));
                         }
                         else {
-                            message.push_str(&format!("{} has played {} hours and has {} hours left to go!\nThey have played ZERO tekken hours within the last 24 hours :(\n\n", birth_name, hours, hours_left));
+                            message.push_str(&format!("{} has played {} hours and has {} hours left to go!\nThey have played ZERO tekken hours within the last 24 hours :(\n\n", birth_name, playtime_outer, hours_left));
                         }
                     }
                     else {
                         user.set_playtime(playtime_outer);
                         if new_week {
-                            message.push_str(&format!("<@{}> has played {} hours and has {} hours left to go!\nThey have played {} tekken hours since last time, way to go :D!!!\n", name, playtime_outer, hours_left, playtime_outer - hours));
+                            message.push_str(&format!("<@{}> has played {} hours and has {} hours left to go!\nThey have played {} tekken hours since last time, way to go :D!!!\n", name, playtime_outer, hours_left, daily_playtime));
                         }
                         else {
-                            message.push_str(&format!("{} has played {} hours and has {} hours left to go!\nThey have played {} tekken hours since last time, way to go :D!!!\n\n", birth_name, playtime_outer, hours_left, playtime_outer - hours));
+                            message.push_str(&format!("{} has played {} hours and has {} hours left to go!\nThey have played {} tekken hours since last time, way to go :D!!!\n\n", birth_name, playtime_outer, hours_left, daily_playtime));
                         }
                     }
                     // If its a new month and we need to see if interest should be added
@@ -120,7 +121,7 @@ async fn update_debt_hours(db: Arc<Mutex<Connection>>, bet_handler:&mut BetOverl
                             playtime_outer = hours_left + (hours_left * 0.05);
                             playtime_outer = round_after_math(playtime_outer);
                             user.set_hours_owed(playtime_outer);
-                            message.push_str(&format!("<@{}> has not played their 5 monthly tekken hours and has incurred the 5% interest penalty. They now owe {} more hours D:\n", name, (hours_left*0.05)));
+                            message.push_str(&format!("<@{}> has not played their 5 monthly tekken hours and has incurred the 5% interest penalty. They now owe {} more hours D:\n", name, round_after_math((hours_left*0.05))));
                         }
                         // reset monthly play counter
                         user.set_monthly_hours(0.0);
@@ -172,7 +173,7 @@ pub fn get_user_debts(db: Arc<Mutex<Connection>>) -> String {
                 let name = user.get_name();
                 let playtime = user.get_playtime();
                 let hours_owed = user.get_hours_owed();
-                let time_left = hours_owed - playtime;
+                let time_left = round_after_math(hours_owed - playtime);
                 if time_left > 0.0 {
                     message.push_str(&format!("{} has played {} hours and still has {} hours left. As a reminder {} has {} total hours owed.\n", name, playtime, time_left, name, hours_owed));
                 }
