@@ -130,7 +130,6 @@ impl EventHandler for Handler {
                     let cleaned = parse_id(author);
                     if msg.content.starts_with("!bet") && BET_HANDLER.lock().unwrap().can_bet(&cleaned) {
                         let parts: Vec<&str> = msg.content.split_whitespace().collect();
-                        // the type is def wrong here for the bets argh
                         let bet_amount = parts[2].parse::<f32>().unwrap_or(-1.0);
                         if bet_amount <= 0.0 || bet_amount > 10.0 {
                             let _ = msg.channel_id.say(&ctx.http, "Incorrect bet value, please try again".to_string()).await;
@@ -164,7 +163,6 @@ impl EventHandler for Handler {
                             let (winner_res, loser_res, amount_res) = BET_HANDLER.lock().unwrap().handle_bet_resolution(db_connection, ticket, parsed_winner.to_string());
                             if winner_res != "Fake" {
                                 let message = format!("<@{}> has won the bet losing {} hours from their debt while <@{}> has lost and nobly takens on {} hours of tekken", winner_res, amount_res, loser_res, amount_res);
-                                // Change for when bot is ready, the bot should send the message to tree and kazoo regardless of where the command was entered
                                 let tree_id = ChannelId::new(1433474989365002342);
                                 let _ = tree_id.say(&ctx.http, message.clone()).await;
                                 let kazoo_id = ChannelId::new(1319106712313135116);
