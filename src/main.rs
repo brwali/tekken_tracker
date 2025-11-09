@@ -131,14 +131,19 @@ impl EventHandler for Handler {
                     if msg.content.starts_with("!bet") && BET_HANDLER.lock().unwrap().can_bet(&cleaned) {
                         let parts: Vec<&str> = msg.content.split_whitespace().collect();
                         let bet_amount = parts[2].parse::<f32>().unwrap_or(-1.0);
+                        // after parsing the bet_amount first check that its a legal value
                         if bet_amount <= 0.0 || bet_amount > 10.0 {
                             let _ = msg.channel_id.say(&ctx.http, "Incorrect bet value, please try again".to_string()).await;
                         } else {
+                            // If it is legal now start to parse the rest of the command
                             let bet_recp = parts[1].to_string();
                             let parsed_bet_recp = parse_id(bet_recp);
                             if cleaned == "Bad request" || parsed_bet_recp == "Bad request" {
                                 let _ = msg.channel_id.say(&ctx.http, "Invalid users entered, please try again".to_string()).await;
                             } else {
+                                // We now know all the values that were entered have been entered correctly, so now
+                                // we need to check if the users are eligble to bet and also that they have the correct
+                                // amount of hours to place the bet
                                 if BET_HANDLER.lock().unwrap().can_bet(&parsed_bet_recp) && BET_HANDLER.lock().unwrap().hour_check(&cleaned, &parsed_bet_recp, bet_amount) {
                                     let ticket_no = BET_HANDLER.lock().unwrap().handle_bet_creation(cleaned.to_string(), parsed_bet_recp.to_string(), bet_amount);
                                     let _ = msg.channel_id.say(&ctx.http, format!("Bet successfully submitted, your bet number is {}\n",ticket_no.to_string())).await;
@@ -207,6 +212,8 @@ impl EventHandler for Handler {
                         if parsed_user != "Bad request" {
                             let http = ctx.http.clone();
                             let amount;
+                            // This database section needs its own scope so that we can send a message as a response after
+                            // the amount has been retrieved from the database
                             {
                                 let db = self.db.clone();
                                 let db_connection = db.lock().unwrap(); 
@@ -231,7 +238,7 @@ impl EventHandler for Handler {
                     // may be necessary but would undermine trust in the bot. So at launch it will not
                     let brandon_id:&str = &format!("{}", env::var("BRANDON_ID").unwrap());
                     let kwangwon_id:&str = &format!("{}", env::var("KWANGWON_ID").unwrap());
-                    if msg.content.starts_with("!add-trusted") && cleaned == brandon_id || cleaned == kwangwon_id {
+                    if msg.content.starts_with("!add-trusted") && (cleaned == brandon_id || cleaned == kwangwon_id) {
                         let parts: Vec<&str> = msg.content.split_whitespace().collect();
                         let winner = parts[1].to_string();
                         let new_trusted = parse_id(winner);
@@ -239,7 +246,7 @@ impl EventHandler for Handler {
                         let _ = BET_HANDLER.lock().unwrap().add_trusted(new_trusted.to_string());
                         let _ = msg.channel_id.say(&http, "Added new member to trusted list").await;
                     }
-                    if msg.content.starts_with("!remove-trusted") && cleaned == brandon_id || cleaned == kwangwon_id {
+                    if msg.content.starts_with("!remove-trusted") && (cleaned == brandon_id || cleaned == kwangwon_id) {
                         let parts: Vec<&str> = msg.content.split_whitespace().collect();
                         let wizard = parts[1].to_string();
                         let new_wizard = parse_id(wizard);
