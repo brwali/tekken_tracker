@@ -18,7 +18,7 @@ static BET_HANDLER: Lazy<Mutex<bet::BetOverlord>> = Lazy::new(|| {
     Mutex::new(bet::BetOverlord::new())
 });
 
-
+// This is bad and a better solution should eventually replace this
 fn setup_betting_manager() {
     let brandon_id:&str = &format!("{}", env::var("BRANDON_ID").unwrap());
     let kwangwon_id:&str = &format!("{}", env::var("KWANGWON_ID").unwrap());
@@ -69,7 +69,13 @@ fn setup_betting_manager() {
     BET_HANDLER.lock().unwrap().add_relation(kwangwon_id.to_string(), "Kwangwon".to_string());
     BET_HANDLER.lock().unwrap().update_bet_hours(kwangwon_id.to_string(), 10.0);
     BET_HANDLER.lock().unwrap().update_hour_change(kwangwon_id.to_string(), 0.0);
-    //Now we need to add the trusted third party members\
+    // Add Kris
+    let kris_id:&str = &format!("{}", env::var("KRIS_ID").unwrap());
+    BET_HANDLER.lock().unwrap().add_better(kris_id.to_string());
+    BET_HANDLER.lock().unwrap().add_relation(kris_id.to_string(), "Kris".to_string());
+    BET_HANDLER.lock().unwrap().update_bet_hours(kris_id.to_string(), 10.0);
+    BET_HANDLER.lock().unwrap().update_hour_change(kris_id.to_string(), 0.0);
+    //Now we need to add the trusted third party members
     // Add Brandon
     BET_HANDLER.lock().unwrap().add_trusted(brandon_id.to_string());
     // Add Kwangwon
