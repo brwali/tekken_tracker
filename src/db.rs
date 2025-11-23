@@ -122,7 +122,11 @@ pub fn init_db() -> Result<Connection> {
             )?;
             conn.execute(
                 "INSERT INTO users (id, name, playtime, hours_owed, steam_id, monthly_hours, bet_hours_available) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-                (&format!("{}", env::var("KWANGWON_ID").unwrap()), "Kwangwon", 2, 2, &format!("{}", env::var("KWANGWON_ID").unwrap()), 0.0, 0.0),
+                (&format!("{}", env::var("KWANGWON_ID").unwrap()), "Kwangwon", 2, 2, &format!("{}", env::var("KWANGWON_STEAM_ID").unwrap()), 0.0, 0.0),
+            )?;
+            conn.execute(
+                "INSERT INTO users (id, name, playtime, hours_owed, steam_id, monthly_hours, bet_hours_available) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                (&format!("{}", env::var("KRIS_ID").unwrap()), "Kwangwon", 2, 2, &format!("{}", env::var("KRIS_STEAM_ID").unwrap()), 0.0, 0.0),
             )?;
             conn.execute(
                 "CREATE TABLE IF NOT EXISTS time (
@@ -224,6 +228,14 @@ pub fn update_time(conn: &Connection, time: Time) -> rusqlite::Result<()> {
     conn.execute(
         "UPDATE time SET month = ?, week = ?, year = ? WHERE id = ?",
         params![time.month, time.week, time.year, time.id],
+    )?;
+    Ok(())
+}
+
+pub fn add_user(conn: &Connection, new_user: User) -> rusqlite::Result<()> {
+    conn.execute(
+        "INSERT INTO users (id, name, playtime, hours_owed, steam_id, monthly_hours, bet_hours_available) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+        (new_user.get_id(), new_user.get_name(), new_user.get_playtime(), new_user.get_hours_owed(), new_user.get_hours_owed(), 0.0, 10.0),
     )?;
     Ok(())
 }
