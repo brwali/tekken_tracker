@@ -118,7 +118,7 @@ async fn update_debt_hours(db: Arc<Mutex<Connection>>, bet_handler:&mut BetOverl
                     if new_month {
                         let monthy_hours = user.get_monthly_hours();
                         if monthy_hours < 5.0 {
-                            playtime_outer = hours_left + (hours_left * 0.05);
+                            playtime_outer = total_hours + (hours_left * 0.05);
                             playtime_outer = round_after_math(playtime_outer);
                             user.set_hours_owed(playtime_outer);
                             message.push_str(&format!("<@{}> has not played their 5 monthly tekken hours and has incurred the 5% interest penalty. They now owe {} more hours D:\n", name, round_after_math(hours_left*0.05)));
