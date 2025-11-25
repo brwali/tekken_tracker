@@ -245,7 +245,7 @@ impl EventHandler for Handler {
                     }
                     if msg.content.starts_with("!help") {
                         let http = ctx.http.clone();
-                        let message = "Reminder for the commands !bet and !winner please @ the user who you are trying to initiate/resolve the bet for\n\n\
+                        let message = "Reminder for the commands !bet and !winner please @ the user who you are trying to initiate/resolve the bet for\n\
                         Commands:\n\n\
                         !bet [bet receiever] [hours bet] - only users who are registered in the system can place bets. If you try to place a bet with a higher hour amount than either player can bet, the bot will reject the creation of the bet.\n\n\
                         !winner [bet winner] [bet number] - this command can only be used by trusted users to clear a bet, please provide the bet number that was given at the bet creation you wish to clear. If you do not remember use the command !list-bets\n\n\
