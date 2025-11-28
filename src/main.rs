@@ -6,6 +6,7 @@ use serenity::model::prelude::*;
 use serenity::Client;
 use once_cell::sync::Lazy;
 use std::sync::{Arc, Mutex};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::env;
 use tokio::time::Duration;
 use rusqlite::Connection;
@@ -18,6 +19,7 @@ static BET_HANDLER: Lazy<Mutex<bet::BetOverlord>> = Lazy::new(|| {
     Mutex::new(bet::BetOverlord::new())
 });
 
+static DAILY_TASK_SPAWNED: AtomicBool = AtomicBool::new(false);
 
 fn parse_id(id: String) -> String {
     let parsed_id = id
@@ -99,6 +101,11 @@ fn setup_betting_manager() {
 impl EventHandler for Handler {
 
     async fn ready(&self, ctx: Context, _data: Ready) {
+
+        if DAILY_TASK_SPAWNED.compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst).is_err() {
+            // already started
+            return;
+        }
 
         setup_betting_manager();
 
