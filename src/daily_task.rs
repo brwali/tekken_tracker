@@ -175,7 +175,7 @@ pub fn get_user_debts(db: Arc<Mutex<Connection>>) -> String {
                 let hours_owed = user.get_hours_owed();
                 let time_left = round_after_math(hours_owed - playtime);
                 if time_left > 0.0 {
-                    message.push_str(&format!("{} has played {} hours and still has {} hours left. As a reminder {} has {} total hours owed.\n", name, playtime, time_left, name, hours_owed));
+                    message.push_str(&format!("{} has played {} hours and still has {} hours left. As a reminder {} has {} total hours owed.\n\n", name, playtime, time_left, name, hours_owed));
                 }
             }
         }

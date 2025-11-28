@@ -42,6 +42,25 @@ impl Time {
 }
 
 impl User {
+    pub fn new(
+        id: String,
+        name: String,
+        playtime: f32,
+        hours_owed: f32,
+        steam_id: String,
+        monthly_hours: f32,
+        bet_hours_available: f32,
+    ) -> Self {
+        User {
+            id,
+            name,
+            playtime,
+            hours_owed,
+            steam_id,
+            monthly_hours,
+            bet_hours_available,
+        }
+    }
     pub fn get_id(&self) -> &str {
         &self.id
     }
@@ -126,9 +145,21 @@ pub fn init_db() -> Result<Connection> {
             )?;
             conn.execute(
                 "INSERT INTO users (id, name, playtime, hours_owed, steam_id, monthly_hours, bet_hours_available) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-                (&format!("{}", env::var("KRIS_ID").unwrap()), "Kwangwon", 2, 2, &format!("{}", env::var("KRIS_STEAM_ID").unwrap()), 0.0, 0.0),
+                (&format!("{}", env::var("KRIS_ID").unwrap()), "Kris", 2, 2, &format!("{}", env::var("KRIS_STEAM_ID").unwrap()), 0.0, 0.0),
             )?;
+        }
+        // Every time the db get intitalized it means that we are updating the bot
+        // the update may not happen in a single day so its better to be able to control
+        // the day counter whenever we choose to launch the bot
+        let mut stmt = conn.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='time'")?;
+        let table_exists = stmt.exists([])?;
+        if table_exists {
             conn.execute(
+                "DROP TABLE time",
+                [],
+            )?;
+        }
+        conn.execute(
                 "CREATE TABLE IF NOT EXISTS time (
                     id INTEGER PRIMARY KEY,
                     month INTEGER NOT NULL,
@@ -140,9 +171,8 @@ pub fn init_db() -> Result<Connection> {
             // Make sure to check that this is right before deployment lol
             conn.execute(
                 "INSERT INTO time (month, week, year) VALUES (?1, ?2, ?3)",
-                (10, 7, 2025),
+                (11, 4, 2025),
             )?;
-        }
     }
     Ok(conn)
 }
@@ -211,14 +241,21 @@ pub fn get_time(conn: &Connection) -> Result<Vec<Time>> {
     time_wizard
 }
 
-pub fn get_monthly_hours(conn: &Connection, id: &str) -> Result<Option<f32>> {
-    let mut statement = conn.prepare("SELECT monthly_hours FROM users WHERE id = ?1")?;
-
-    let mut rows = statement.query(params![id])?;
+pub fn get_user(conn: &Connection, id: &str) -> Result<Option<User>> {
+    let mut stmt = conn.prepare("SELECT * FROM users WHERE id = ?1")?;
+    let mut rows = stmt.query(params![id])?;
 
     if let Some(row) = rows.next()? {
-        let monthly_hours: f32 = row.get(0)?;
-        Ok(Some(monthly_hours))
+        let user = User {
+            id: row.get(0)?,
+            name: row.get(1)?,
+            playtime: row.get(2)?,
+            hours_owed: row.get(3)?,
+            steam_id: row.get(4)?,
+            monthly_hours: row.get(5)?,
+            bet_hours_available: row.get(6)?,
+        };
+        Ok(Some(user))
     } else {
         Ok(None)
     }
@@ -236,6 +273,14 @@ pub fn add_user(conn: &Connection, new_user: User) -> rusqlite::Result<()> {
     conn.execute(
         "INSERT INTO users (id, name, playtime, hours_owed, steam_id, monthly_hours, bet_hours_available) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
         (new_user.get_id(), new_user.get_name(), new_user.get_playtime(), new_user.get_hours_owed(), new_user.get_hours_owed(), 0.0, 10.0),
+    )?;
+    Ok(())
+}
+
+pub fn update_hours_owed(conn: &Connection, id: &str, hours: f32) -> rusqlite::Result<()> {
+    conn.execute(
+        "UPDATE users SET hours_owed = ? WHERE id = ?",
+        params![hours, id],
     )?;
     Ok(())
 }

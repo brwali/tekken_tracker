@@ -1,6 +1,7 @@
 mod db;
 mod daily_task;
 mod bet;
+use crate::db::User;
 use serenity::prelude::*;
 use serenity::model::prelude::*;
 use serenity::Client;
@@ -29,72 +30,26 @@ fn parse_id(id: String) -> String {
             .unwrap_or("Bad request");
     return parsed_id.to_string();
 }
-// This is bad and a better solution should eventually replace this
-fn setup_betting_manager() {
-    let brandon_id:&str = &format!("{}", env::var("BRANDON_ID").unwrap());
-    let kwangwon_id:&str = &format!("{}", env::var("KWANGWON_ID").unwrap());
-    // First we need to add the people who can bet
-    // Add Jackson
-    let jackson_id:&str = &format!("{}", env::var("JACKSON_ID").unwrap());
-    BET_HANDLER.lock().unwrap().add_better(jackson_id.to_string());
-    BET_HANDLER.lock().unwrap().add_relation(jackson_id.to_string(), "Jackson".to_string());
-    BET_HANDLER.lock().unwrap().update_bet_hours(jackson_id.to_string(), 10.0);
-    BET_HANDLER.lock().unwrap().update_hour_change(jackson_id.to_string(), 0.0);
-    // Add Mason
-    let mason_id:&str = &format!("{}", env::var("MASON_ID").unwrap());
-    BET_HANDLER.lock().unwrap().add_better(mason_id.to_string());
-    BET_HANDLER.lock().unwrap().add_relation(mason_id.to_string(), "Mason".to_string());
-    BET_HANDLER.lock().unwrap().update_bet_hours(mason_id.to_string(), 10.0);
-    BET_HANDLER.lock().unwrap().update_hour_change(mason_id.to_string(), 0.0);
-    // Add Jonathan
-    let jon_id:&str = &format!("{}", env::var("JON_ID").unwrap());
-    BET_HANDLER.lock().unwrap().add_better(jon_id.to_string());
-    BET_HANDLER.lock().unwrap().add_relation(jon_id.to_string(), "Jonathan".to_string());
-    BET_HANDLER.lock().unwrap().update_bet_hours(jon_id.to_string(), 10.0);
-    BET_HANDLER.lock().unwrap().update_hour_change(jon_id.to_string(), 0.0);
-    // Add Logan
-    let logan_id:&str = &format!("{}", env::var("LOGAN_ID").unwrap());
-    BET_HANDLER.lock().unwrap().add_better(logan_id.to_string());
-    BET_HANDLER.lock().unwrap().add_relation(logan_id.to_string(), "Logan".to_string());
-    BET_HANDLER.lock().unwrap().update_bet_hours(logan_id.to_string(), 10.0);
-    BET_HANDLER.lock().unwrap().update_hour_change(logan_id.to_string(), 0.0);
-    // Add Brandon
-    BET_HANDLER.lock().unwrap().add_better(brandon_id.to_string());
-    BET_HANDLER.lock().unwrap().add_relation(brandon_id.to_string(), "Brandon".to_string());
-    BET_HANDLER.lock().unwrap().update_bet_hours(brandon_id.to_string(), 10.0);
-    BET_HANDLER.lock().unwrap().update_hour_change(brandon_id.to_string(), 0.0);
-    // Add Wyatt
-    let wyatt_id:&str = &format!("{}", env::var("WYATT_ID").unwrap());
-    BET_HANDLER.lock().unwrap().add_better(wyatt_id.to_string());
-    BET_HANDLER.lock().unwrap().add_relation(wyatt_id.to_string(), "Wyatt".to_string());
-    BET_HANDLER.lock().unwrap().update_bet_hours(wyatt_id.to_string(), 10.0);
-    BET_HANDLER.lock().unwrap().update_hour_change(wyatt_id.to_string(), 0.0);
-    // Add Bryan
-    let bryan_id:&str = &format!("{}", env::var("BRYAN_ID").unwrap());
-    BET_HANDLER.lock().unwrap().add_better(bryan_id.to_string());
-    BET_HANDLER.lock().unwrap().add_relation(bryan_id.to_string(), "Bryan".to_string());
-    BET_HANDLER.lock().unwrap().update_bet_hours(bryan_id.to_string(), 10.0);
-    BET_HANDLER.lock().unwrap().update_hour_change(bryan_id.to_string(), 0.0);
-    // Add Kwangwon
-    BET_HANDLER.lock().unwrap().add_better(kwangwon_id.to_string());
-    BET_HANDLER.lock().unwrap().add_relation(kwangwon_id.to_string(), "Kwangwon".to_string());
-    BET_HANDLER.lock().unwrap().update_bet_hours(kwangwon_id.to_string(), 10.0);
-    BET_HANDLER.lock().unwrap().update_hour_change(kwangwon_id.to_string(), 0.0);
-    // Add Kris
-    let kris_id:&str = &format!("{}", env::var("KRIS_ID").unwrap());
-    BET_HANDLER.lock().unwrap().add_better(kris_id.to_string());
-    BET_HANDLER.lock().unwrap().add_relation(kris_id.to_string(), "Kris".to_string());
-    BET_HANDLER.lock().unwrap().update_bet_hours(kris_id.to_string(), 10.0);
-    BET_HANDLER.lock().unwrap().update_hour_change(kris_id.to_string(), 0.0);
-    //Now we need to add the trusted third party members
-    // Add Brandon
-    BET_HANDLER.lock().unwrap().add_trusted(brandon_id.to_string());
-    // Add Kwangwon
-    BET_HANDLER.lock().unwrap().add_trusted(kwangwon_id.to_string());
-    // Add Daniel
-    let daniel_id:&str = &format!("{}", env::var("DANIEL_ID").unwrap_or("".to_string()));
-    BET_HANDLER.lock().unwrap().add_trusted(daniel_id.to_string());
-    BET_HANDLER.lock().unwrap().add_relation(daniel_id.to_string(), "Daniel".to_string());
+
+fn setup_betting_manager(db: Arc<Mutex<Connection>>) {
+    let db_connection = db.lock().unwrap();
+    match db::get_users(&db_connection) {
+        Ok(users) => {
+            for user in &users {
+                BET_HANDLER.lock().unwrap().add_better(user.get_id().to_string());
+                BET_HANDLER.lock().unwrap().add_relation(user.get_id().to_string(), user.get_name().to_string());
+                BET_HANDLER.lock().unwrap().update_bet_hours(user.get_id().to_string(), 10.0);
+                BET_HANDLER.lock().unwrap().update_hour_change(user.get_id().to_string(), 0.0);
+                // Not ideal but for the time being should work, should probably be a schema change
+                if user.get_name() == "Kwangwon" || user.get_name() == "Brandon" || user.get_name() == "Daniel" {
+                    BET_HANDLER.lock().unwrap().add_trusted(user.get_id().to_string());
+                }
+            }
+        }
+        Err(e) => {
+            println!("Database error: {:?}", e);
+        }
+    }
 }
 
 #[serenity::async_trait]
@@ -106,8 +61,12 @@ impl EventHandler for Handler {
             // already started
             return;
         }
-
-        setup_betting_manager();
+        // we only want this copy of the db to exist for setting up
+        // the bet manager, so set it in its own scope
+        {
+            let setup_db = self.db.clone();
+            setup_betting_manager(setup_db);
+        }
 
         tokio::spawn({
             let http = ctx.http.clone();
@@ -181,7 +140,7 @@ impl EventHandler for Handler {
                         } else {
                             let (winner_res, loser_res, amount_res) = BET_HANDLER.lock().unwrap().handle_bet_resolution(db_connection, ticket, parsed_winner.to_string());
                             if winner_res != "Fake" {
-                                let message = format!("<@{}> has won the bet losing {} hours from their debt while <@{}> has lost and nobly takens on {} hours of tekken", winner_res, amount_res, loser_res, amount_res);
+                                let message = format!("<@{}> has won the bet losing {} hours from their debt while <@{}> has lost and nobly taking on {} hours of tekken", winner_res, amount_res, loser_res, amount_res);
                                 let tree_id = ChannelId::new(1433474989365002342);
                                 let _ = tree_id.say(&ctx.http, message.clone()).await;
                                 let kazoo_id = ChannelId::new(1319106712313135116);
@@ -219,32 +178,37 @@ impl EventHandler for Handler {
                         let message = daily_task::get_user_debts(db_connection);
                         let _ = msg.channel_id.say(&http, message).await;
                     }
-                    if msg.content.starts_with("!monthly-hours") {
+                    if msg.content.starts_with("!show-user-stats") {
                         let parts: Vec<&str> = msg.content.split_whitespace().collect();
                         let user = parts[1].to_string();
                         let parsed_user = parse_id(user);
                         if parsed_user != "Bad request" {
                             let http = ctx.http.clone();
-                            let amount;
+                            let user;
                             // This database section needs its own scope so that we can send a message as a response after
                             // the amount has been retrieved from the database
                             {
                                 let db = self.db.clone();
-                                let db_connection = db.lock().unwrap(); 
-                                amount = db::get_monthly_hours(&db_connection, &parsed_user).unwrap();
+                                let db_connection = db.lock().unwrap();
+                                // This is actually awful and needs to be fixed, but can be fixed later
+                                user = db::get_user(&db_connection, &parsed_user).unwrap().unwrap();
                             }
-                            let _ = msg.channel_id.say(&http, format!("They have played {:?} hours this month", amount.unwrap())).await;
+                            let _ = msg.channel_id.say(&http, format!(
+                                    "{} has played {:?} hours\n\nOwes a total of {:?} hours\n\nHas played {:?} hours this month\n\nAnd has {:?} hours to bet with this week",
+                                    user.get_name(), user.get_playtime(), user.get_hours_owed(), user.get_monthly_hours(), BET_HANDLER.lock().unwrap().get_bet_hours(user.get_id())
+                                )).await;
                         }
                     }
                     if msg.content.starts_with("!help") {
                         let http = ctx.http.clone();
-                        let message = "Reminder for the commands !bet and !winner please @ the user who you are trying to initiate/resolve the bet for\n\
+                        let message = "Reminder for the commands !bet, !winner, and !show-user-stats please @ the user for each respective command\n\
                         Commands:\n\n\
                         !bet [bet receiever] [hours bet] - only users who are registered in the system can place bets. If you try to place a bet with a higher hour amount than either player can bet, the bot will reject the creation of the bet.\n\n\
                         !winner [bet winner] [bet number] - this command can only be used by trusted users to clear a bet, please provide the bet number that was given at the bet creation you wish to clear. If you do not remember use the command !list-bets\n\n\
                         !cancel-bet [bet number] - this command can only be used by trusted users to cancel a bet, please provide the bet number to remove the bet from the outstanding bets which will also refund each player their bet hours. If you do not remember use the command !list-bets\n\n\
                         !list-bets - any user can use this command and it will show a list of the outstanding bets which include the users invovled as well as the bet number\n\n\
-                        !debts - any user can use this command and it will show the users in the system who still have outstanding debt\n\n";
+                        !debts - any user can use this command and it will show the users in the system who still have outstanding debt\n\n\
+                        !show-user-stats [tekken gamer] - any user can use this command and it will show the total hours played, hours owed, monthly hours, and bet hours available for the week\n\n";
                         let _ = msg.channel_id.say(&http, message).await;
                     }
                     // The following functions are only intended for admin use and so will not be added to the help message
@@ -267,6 +231,52 @@ impl EventHandler for Handler {
                         let http = ctx.http.clone();
                         let _ = BET_HANDLER.lock().unwrap().remove_trusted(&new_wizard);
                         let _ = msg.channel_id.say(&http, "Removed member from the trusted list").await;
+                    }
+                    if msg.content.starts_with("!add-user") && (cleaned == brandon_id || cleaned == kwangwon_id) {
+                        let parts: Vec<&str> = msg.content.split_whitespace().collect();
+                        let wizard = parts[1].to_string();
+                        let new_wizard = parse_id(wizard);
+                        let name = parts[2].to_string();
+                        let playtime = parts[3].parse::<f32>().unwrap_or(-1.0);
+                        let hours_owed = parts[4].parse::<f32>().unwrap_or(-1.0);
+                        let steam_id = parts[5].to_string();
+                        // update the bet handler first
+                        // This is bad code btw, I shouldn't be cloning each time I want to pass the value
+                        // however, I also don't have time currently to properly fix this prime target for
+                        // (Issue #11)
+                        BET_HANDLER.lock().unwrap().add_better(new_wizard.clone());
+                        BET_HANDLER.lock().unwrap().add_relation(new_wizard.clone(), name.clone());
+                        BET_HANDLER.lock().unwrap().update_bet_hours(new_wizard.clone(), 10.0);
+                        BET_HANDLER.lock().unwrap().update_hour_change(new_wizard.clone(), 0.0);
+                        let newbie = User::new(new_wizard, name, playtime, hours_owed, steam_id, 0.0, 10.0);
+                        // now update the db
+                        {
+                            let db = self.db.clone();
+                            let db_connection = db.lock().unwrap();
+                            let _ = db::add_user(&db_connection, newbie).unwrap();
+                        }
+                        // send a success message
+                        let http = ctx.http.clone();
+                        let _ = msg.channel_id.say(&http, "Added user to the bot").await;
+                    }
+                    if msg.content.starts_with("!adjust-hours") && (cleaned == brandon_id || cleaned == kwangwon_id) {
+                        let parts: Vec<&str> = msg.content.split_whitespace().collect();
+                        let wizard = parts[1].to_string();
+                        let new_wizard = parse_id(wizard);
+                        let new_hours = parts[2].parse::<f32>().unwrap_or(-1.0);
+                        let http = ctx.http.clone();
+                        if new_hours == -1.0 {
+                            let _ = msg.channel_id.say(&http, "Invalid hour amount").await;
+                        } else {
+                            // Another instance of the db needing its own scope because we want to send a
+                            // message after the db operation is successful
+                            {
+                                let db = self.db.clone();
+                                let db_connection = db.lock().unwrap(); 
+                                let _ = db::update_hours_owed(&db_connection, &new_wizard, new_hours).unwrap();
+                            }
+                            let _ = msg.channel_id.say(&http, "successfully updated hours").await;
+                        }
                     }
                 }
             }
