@@ -41,10 +41,10 @@ async fn update_debt_hours(db: Arc<Mutex<Connection>>, bet_handler:&mut BetOverl
                     time.set_week(bumped);
                 }
                 if month != current_month {
-                    time.set_month(month);
+                    time.set_month(current_month);
                 }
                 if year != current_year {
-                    time.set_year(year);
+                    time.set_year(current_year);
                 }
                 if month < current_month || (month >= current_month && year < current_year) {
                     new_month = true;
@@ -107,6 +107,8 @@ async fn update_debt_hours(db: Arc<Mutex<Connection>>, bet_handler:&mut BetOverl
                     }
                     else {
                         user.set_playtime(playtime_outer);
+                        let monthly_hours = user.get_monthly_hours();
+                        user.set_monthly_hours(round_after_math(monthly_hours + daily_playtime));
                         if new_week {
                             message.push_str(&format!("<@{}> has played {} hours and has {} hours left to go!\nThey have played {} tekken hours since last time, way to go :D!!!\n", name, playtime_outer, hours_left, daily_playtime));
                         }
@@ -121,7 +123,7 @@ async fn update_debt_hours(db: Arc<Mutex<Connection>>, bet_handler:&mut BetOverl
                             playtime_outer = total_hours + (hours_left * 0.05);
                             playtime_outer = round_after_math(playtime_outer);
                             user.set_hours_owed(playtime_outer);
-                            message.push_str(&format!("<@{}> has not played their 5 monthly tekken hours and has incurred the 5% interest penalty. They now owe {} more hours D:\n", name, round_after_math(hours_left*0.05)));
+                            message.push_str(&format!("<@{}> has not played their 5 monthly tekken hours and has incurred the 5% interest penalty. They now owe {} more hours D:\n\n", name, round_after_math(hours_left*0.05)));
                         }
                         // reset monthly play counter
                         user.set_monthly_hours(0.0);

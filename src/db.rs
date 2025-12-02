@@ -171,7 +171,7 @@ pub fn init_db() -> Result<Connection> {
             // Make sure to check that this is right before deployment lol
             conn.execute(
                 "INSERT INTO time (month, week, year) VALUES (?1, ?2, ?3)",
-                (11, 4, 2025),
+                (12, 1, 2025),
             )?;
     }
     Ok(conn)
