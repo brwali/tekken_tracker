@@ -1,5 +1,6 @@
 use crate::db;
 use crate::bet;
+use crate::db::Time;
 use std::sync::{Arc, Mutex};
 use std::env;
 use reqwest::Client as ReqwestClient;
@@ -7,6 +8,9 @@ use chrono::prelude::*;
 use serde_json::Value;
 use rusqlite::Connection;
 use bet::BetOverlord;
+
+// Global consts
+const TEKKEN_APP_ID: u64 = 1778820;
 
 async fn send_steam_request(request: &str) -> Option<Value> {
     let client = ReqwestClient::new();
@@ -23,37 +27,42 @@ async fn update_debt_hours(db: Arc<Mutex<Connection>>, bet_handler:&mut BetOverl
     let db_connection = db.lock().unwrap();
     let mut new_week = false;
     let mut new_month = false;
+    let mut time = Time::new();
+    // Keeps track of # of days since last tekken game
+    let mut zero_day_streak = 0;
+    let mut total_hours_today = 0.0;
     match db::get_time(&db_connection) {
         Ok(mut time_wizard) => {
-            for time in &mut time_wizard {
+            for t in &mut time_wizard {
                 let now = Local::now();
                 let current_month = now.month();
                 let current_year = now.year();
-                let week = time.get_week();
-                let month = time.get_month();
-                let year = time.get_year();
+                let week = t.get_week();
+                let month = t.get_month();
+                let year = t.get_year();
+                zero_day_streak = t.get_zero_day_streak();
                 if week == 7 {
-                    time.set_week(1);
+                    t.set_week(1);
                     new_week = true;
                 }
                 else {
                     let bumped = week + 1;
-                    time.set_week(bumped);
+                    t.set_week(bumped);
                 }
                 if month != current_month {
-                    time.set_month(current_month);
+                    t.set_month(current_month);
                 }
                 if year != current_year {
-                    time.set_year(current_year);
+                    t.set_year(current_year);
                 }
                 if month < current_month || (month >= current_month && year < current_year) {
                     new_month = true;
                 }
-                let _ = db::update_time(&db_connection, time.clone());
+                time = t.clone();
             }
         }
         Err(e) => {
-            println!("Database error: {:?}", e);
+            return format!("Database error: {:?}", e).to_string();
         }
     }
     // "https://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/?key={}&steamid={}&format=json"
@@ -78,9 +87,8 @@ async fn update_debt_hours(db: Arc<Mutex<Connection>>, bet_handler:&mut BetOverl
                         if let Some(games) = json.get("response")
                                                 .and_then(|r| r.get("games"))
                                                 .and_then(|g| g.as_array()) {
-                            // Find the game with appid 1778820
                             if let Some(tekken_game) = games.iter().find(|game| {
-                                game.get("appid").and_then(|id| id.as_u64()) == Some(1778820)
+                                game.get("appid").and_then(|id| id.as_u64()) == Some(TEKKEN_APP_ID)
                             }) {
                                 // Get playtime_forever in minutes
                                 let playtime = tekken_game.get("playtime_forever")
@@ -106,6 +114,7 @@ async fn update_debt_hours(db: Arc<Mutex<Connection>>, bet_handler:&mut BetOverl
                         }
                     }
                     else {
+                        total_hours_today += daily_playtime;
                         user.set_playtime(playtime_outer);
                         let monthly_hours = user.get_monthly_hours();
                         user.set_monthly_hours(round_after_math(monthly_hours + daily_playtime));
@@ -153,11 +162,22 @@ async fn update_debt_hours(db: Arc<Mutex<Connection>>, bet_handler:&mut BetOverl
                 }
                 let _ = db::update_user(&db_connection, user.clone());
             }
+            if total_hours_today > 0.0 {
+                zero_day_streak = 0;
+                message.push_str(&format!("The debtors have played {} hours of tekken today! POG\n\n", total_hours_today));
+            } else {
+                zero_day_streak += 1;
+                message.push_str(&format!("The debtors have played ZERO hours of tekken today.\n\n"));
+                message.push_str(&format!("It has been {} days since any tekken has been played.\n\n", zero_day_streak));
+            }
         }
         Err(e) => {
             println!("Database error: {:?}", e);
         }
     }
+    time.set_zero_day_streak(zero_day_streak);
+    // Update time DB table
+    let _ = db::update_time(&db_connection, time.clone());
     message
 }
 
