@@ -1,5 +1,6 @@
 use crate::db;
 use crate::bet;
+use crate::db::Time;
 use std::sync::{Arc, Mutex};
 use std::env;
 use reqwest::Client as ReqwestClient;
@@ -26,39 +27,42 @@ async fn update_debt_hours(db: Arc<Mutex<Connection>>, bet_handler:&mut BetOverl
     let db_connection = db.lock().unwrap();
     let mut new_week = false;
     let mut new_month = false;
-    // Vars for tracking aggregate hours played accross all debtors
+    let mut time = Time::new();
+    // Keeps track of # of days since last tekken game
+    let mut zero_day_streak = 0;
     let mut total_hours_today = 0.0;
     match db::get_time(&db_connection) {
         Ok(mut time_wizard) => {
-            for time in &mut time_wizard {
+            for t in &mut time_wizard {
                 let now = Local::now();
                 let current_month = now.month();
                 let current_year = now.year();
-                let week = time.get_week();
-                let month = time.get_month();
-                let year = time.get_year();
+                let week = t.get_week();
+                let month = t.get_month();
+                let year = t.get_year();
+                zero_day_streak = t.get_zero_day_streak();
                 if week == 7 {
-                    time.set_week(1);
+                    t.set_week(1);
                     new_week = true;
                 }
                 else {
                     let bumped = week + 1;
-                    time.set_week(bumped);
+                    t.set_week(bumped);
                 }
                 if month != current_month {
-                    time.set_month(current_month);
+                    t.set_month(current_month);
                 }
                 if year != current_year {
-                    time.set_year(current_year);
+                    t.set_year(current_year);
                 }
                 if month < current_month || (month >= current_month && year < current_year) {
                     new_month = true;
                 }
-                let _ = db::update_time(&db_connection, time.clone());
+                time = t.clone();
             }
         }
         Err(e) => {
-            println!("Database error: {:?}", e);
+            return format!("Database error: {:?}", e).to_string();
         }
     }
     // "https://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/?key={}&steamid={}&format=json"
@@ -159,15 +163,21 @@ async fn update_debt_hours(db: Arc<Mutex<Connection>>, bet_handler:&mut BetOverl
                 let _ = db::update_user(&db_connection, user.clone());
             }
             if total_hours_today > 0.0 {
+                zero_day_streak = 0;
                 message.push_str(&format!("The debtors have played {} hours of tekken today! POG\n\n", total_hours_today));
             } else {
+                zero_day_streak += 1;
                 message.push_str(&format!("The debtors have played ZERO hours of tekken today.\n\n"));
+                message.push_str(&format!("It has been {} days since any tekken has been played.\n\n", zero_day_streak));
             }
         }
         Err(e) => {
             println!("Database error: {:?}", e);
         }
     }
+    time.set_zero_day_streak(zero_day_streak);
+    // Update time DB table
+    let _ = db::update_time(&db_connection, time.clone());
     message
 }
 
