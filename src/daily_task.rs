@@ -191,3 +191,22 @@ pub fn get_user_debts(db: Arc<Mutex<Connection>>) -> String {
 pub fn round_after_math(val: f32) -> f32 {
     (val * 100.0).trunc() / 100.0
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_round_after_math_positive() {
+        assert_eq!(round_after_math(1.2345), 1.23);
+        assert_eq!(round_after_math(0.0), 0.0);
+        assert_eq!(round_after_math(2.9999), 2.99);
+    }
+
+    #[test]
+    fn test_round_after_math_negative() {
+        // truncation moves toward zero for negatives
+        assert_eq!(round_after_math(-1.239), -1.23);
+        assert_eq!(round_after_math(-0.001), 0.0);
+    }
+}
