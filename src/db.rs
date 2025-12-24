@@ -284,3 +284,43 @@ pub fn update_hours_owed(conn: &Connection, id: &str, hours: f32) -> rusqlite::R
     )?;
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_user_getters_setters() {
+        let mut u = User::new(
+            "id1".to_string(),
+            "Alice".to_string(),
+            1.23,
+            10.0,
+            "steam123".to_string(),
+            0.0,
+            5.0,
+        );
+        assert_eq!(u.get_id(), "id1");
+        assert_eq!(u.get_name(), "Alice");
+        assert!((u.get_playtime() - 1.23).abs() < f32::EPSILON);
+        assert!((u.get_hours_owed() - 10.0).abs() < f32::EPSILON);
+        u.set_playtime(2.5);
+        assert!((u.get_playtime() - 2.5).abs() < f32::EPSILON);
+        u.set_hours_owed(7.75);
+        assert!((u.get_hours_owed() - 7.75).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn test_time_getters_setters() {
+        let mut t = Time { id: 1, month: 12, week: 3, year: 2025 };
+        assert_eq!(t.get_month(), 12);
+        assert_eq!(t.get_week(), 3);
+        assert_eq!(t.get_year(), 2025);
+        t.set_month(1);
+        t.set_week(7);
+        t.set_year(2026);
+        assert_eq!(t.get_month(), 1);
+        assert_eq!(t.get_week(), 7);
+        assert_eq!(t.get_year(), 2026);
+    }
+}
