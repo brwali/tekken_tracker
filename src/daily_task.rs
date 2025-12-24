@@ -8,6 +8,9 @@ use serde_json::Value;
 use rusqlite::Connection;
 use bet::BetOverlord;
 
+// Global consts
+const TEKKEN_APP_ID: u64 = 1778820;
+
 async fn send_steam_request(request: &str) -> Option<Value> {
     let client = ReqwestClient::new();
     let resp = client.get(request).send().await.ok()?;
@@ -23,6 +26,8 @@ async fn update_debt_hours(db: Arc<Mutex<Connection>>, bet_handler:&mut BetOverl
     let db_connection = db.lock().unwrap();
     let mut new_week = false;
     let mut new_month = false;
+    // Vars for tracking aggregate hours played accross all debtors
+    let mut total_hours_today = 0.0;
     match db::get_time(&db_connection) {
         Ok(mut time_wizard) => {
             for time in &mut time_wizard {
@@ -78,9 +83,8 @@ async fn update_debt_hours(db: Arc<Mutex<Connection>>, bet_handler:&mut BetOverl
                         if let Some(games) = json.get("response")
                                                 .and_then(|r| r.get("games"))
                                                 .and_then(|g| g.as_array()) {
-                            // Find the game with appid 1778820
                             if let Some(tekken_game) = games.iter().find(|game| {
-                                game.get("appid").and_then(|id| id.as_u64()) == Some(1778820)
+                                game.get("appid").and_then(|id| id.as_u64()) == Some(TEKKEN_APP_ID)
                             }) {
                                 // Get playtime_forever in minutes
                                 let playtime = tekken_game.get("playtime_forever")
@@ -106,6 +110,7 @@ async fn update_debt_hours(db: Arc<Mutex<Connection>>, bet_handler:&mut BetOverl
                         }
                     }
                     else {
+                        total_hours_today += daily_playtime;
                         user.set_playtime(playtime_outer);
                         let monthly_hours = user.get_monthly_hours();
                         user.set_monthly_hours(round_after_math(monthly_hours + daily_playtime));
@@ -152,6 +157,11 @@ async fn update_debt_hours(db: Arc<Mutex<Connection>>, bet_handler:&mut BetOverl
                     user.set_bet_hours_available(bet_handler.get_bet_hours(&name));
                 }
                 let _ = db::update_user(&db_connection, user.clone());
+            }
+            if total_hours_today > 0.0 {
+                message.push_str(&format!("The debtors have played {} hours of tekken today! POG\n\n", total_hours_today));
+            } else {
+                message.push_str(&format!("The debtors have played ZERO hours of tekken today.\n\n"));
             }
         }
         Err(e) => {
