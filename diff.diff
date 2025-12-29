@@ -1,0 +1,193 @@
+diff --git a/src/daily_task.rs b/src/daily_task.rs
+index 044a38d..e1a90fa 100644
+--- a/src/daily_task.rs
++++ b/src/daily_task.rs
+@@ -1,5 +1,6 @@
+ use crate::db;
+ use crate::bet;
++use crate::db::Time;
+ use std::sync::{Arc, Mutex};
+ use std::env;
+ use reqwest::Client as ReqwestClient;
+@@ -8,6 +9,9 @@ use serde_json::Value;
+ use rusqlite::Connection;
+ use bet::BetOverlord;
+ 
++// Global consts
++const TEKKEN_APP_ID: u64 = 1778820;
++
+ async fn send_steam_request(request: &str) -> Option<Value> {
+     let client = ReqwestClient::new();
+     let resp = client.get(request).send().await.ok()?;
+@@ -23,37 +27,42 @@ async fn update_debt_hours(db: Arc<Mutex<Connection>>, bet_handler:&mut BetOverl
+     let db_connection = db.lock().unwrap();
+     let mut new_week = false;
+     let mut new_month = false;
++    let mut time = Time::new();
++    // Keeps track of # of days since last tekken game
++    let mut zero_day_streak = 0;
++    let mut total_hours_today = 0.0;
+     match db::get_time(&db_connection) {
+         Ok(mut time_wizard) => {
+-            for time in &mut time_wizard {
++            for t in &mut time_wizard {
+                 let now = Local::now();
+                 let current_month = now.month();
+                 let current_year = now.year();
+-                let week = time.get_week();
+-                let month = time.get_month();
+-                let year = time.get_year();
++                let week = t.get_week();
++                let month = t.get_month();
++                let year = t.get_year();
++                zero_day_streak = t.get_zero_day_streak();
+                 if week == 7 {
+-                    time.set_week(1);
++                    t.set_week(1);
+                     new_week = true;
+                 }
+                 else {
+                     let bumped = week + 1;
+-                    time.set_week(bumped);
++                    t.set_week(bumped);
+                 }
+                 if month != current_month {
+-                    time.set_month(current_month);
++                    t.set_month(current_month);
+                 }
+                 if year != current_year {
+-                    time.set_year(current_year);
++                    t.set_year(current_year);
+                 }
+                 if month < current_month || (month >= current_month && year < current_year) {
+                     new_month = true;
+                 }
+-                let _ = db::update_time(&db_connection, time.clone());
++                time = t.clone();
+             }
+         }
+         Err(e) => {
+-            println!("Database error: {:?}", e);
++            return format!("Database error: {:?}", e).to_string();
+         }
+     }
+     // "https://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/?key={}&steamid={}&format=json"
+@@ -78,9 +87,8 @@ async fn update_debt_hours(db: Arc<Mutex<Connection>>, bet_handler:&mut BetOverl
+                         if let Some(games) = json.get("response")
+                                                 .and_then(|r| r.get("games"))
+                                                 .and_then(|g| g.as_array()) {
+-                            // Find the game with appid 1778820
+                             if let Some(tekken_game) = games.iter().find(|game| {
+-                                game.get("appid").and_then(|id| id.as_u64()) == Some(1778820)
++                                game.get("appid").and_then(|id| id.as_u64()) == Some(TEKKEN_APP_ID)
+                             }) {
+                                 // Get playtime_forever in minutes
+                                 let playtime = tekken_game.get("playtime_forever")
+@@ -106,6 +114,7 @@ async fn update_debt_hours(db: Arc<Mutex<Connection>>, bet_handler:&mut BetOverl
+                         }
+                     }
+                     else {
++                        total_hours_today += daily_playtime;
+                         user.set_playtime(playtime_outer);
+                         let monthly_hours = user.get_monthly_hours();
+                         user.set_monthly_hours(round_after_math(monthly_hours + daily_playtime));
+@@ -153,11 +162,22 @@ async fn update_debt_hours(db: Arc<Mutex<Connection>>, bet_handler:&mut BetOverl
+                 }
+                 let _ = db::update_user(&db_connection, user.clone());
+             }
++            if total_hours_today > 0.0 {
++                zero_day_streak = 0;
++                message.push_str(&format!("The debtors have played {} hours of tekken today! POG\n\n", total_hours_today));
++            } else {
++                zero_day_streak += 1;
++                message.push_str(&format!("The debtors have played ZERO hours of tekken today.\n\n"));
++                message.push_str(&format!("It has been {} days since any tekken has been played.\n\n", zero_day_streak));
++            }
+         }
+         Err(e) => {
+             println!("Database error: {:?}", e);
+         }
+     }
++    time.set_zero_day_streak(zero_day_streak);
++    // Update time DB table
++    let _ = db::update_time(&db_connection, time.clone());
+     message
+ }
+ 
+diff --git a/src/db.rs b/src/db.rs
+index dfada0c..75b7805 100644
+--- a/src/db.rs
++++ b/src/db.rs
+@@ -18,9 +18,13 @@ pub struct Time {
+     month: u32,
+     week: i32,
+     year: i32,
++    zero_day_streak: u32
+ }
+ 
+ impl Time {
++    pub fn new() -> Self {
++        Time {id: 0, month: 0, week: 0, year: 0, zero_day_streak: 0}
++    }
+     pub fn get_month(&self) -> u32 {
+         self.month
+     }
+@@ -30,6 +34,9 @@ impl Time {
+     pub fn get_year(&self) -> i32 {
+         self.year
+     }
++    pub fn get_zero_day_streak(&self) -> u32 {
++        self.zero_day_streak
++    }
+     pub fn set_month(&mut self, new_month: u32) {
+         self.month = new_month;
+     }
+@@ -39,6 +46,9 @@ impl Time {
+     pub fn set_year(&mut self, new_year: i32) {
+         self.year = new_year;
+     }
++    pub fn set_zero_day_streak(&mut self, zero_day_streak: u32) {
++        self.zero_day_streak = zero_day_streak;
++    }
+ }
+ 
+ impl User {
+@@ -164,14 +174,15 @@ pub fn init_db() -> Result<Connection> {
+                     id INTEGER PRIMARY KEY,
+                     month INTEGER NOT NULL,
+                     week INTEGER NOT NULL,
+-                    year INTEGER NOT NULL
++                    year INTEGER NOT NULL,
++                    zero_day_streak INTEGER NOT NULL
+                 )",
+                 [],
+             )?;
+             // Make sure to check that this is right before deployment lol
+             conn.execute(
+-                "INSERT INTO time (month, week, year) VALUES (?1, ?2, ?3)",
+-                (12, 1, 2025),
++                "INSERT INTO time (month, week, year, zero_day_streak) VALUES (?1, ?2, ?3, ?4)",
++                (12, 1, 2025, 0),
+             )?;
+     }
+     Ok(conn)
+@@ -235,6 +246,7 @@ pub fn get_time(conn: &Connection) -> Result<Vec<Time>> {
+             month: row.get(1)?,
+             week: row.get(2)?,
+             year: row.get(3)?,
++            zero_day_streak : row.get(4)?,
+         })
+     })?;
+     let time_wizard: Result<Vec<Time>> = time_collection.collect();
+@@ -263,8 +275,8 @@ pub fn get_user(conn: &Connection, id: &str) -> Result<Option<User>> {
+ 
+ pub fn update_time(conn: &Connection, time: Time) -> rusqlite::Result<()> {
+     conn.execute(
+-        "UPDATE time SET month = ?, week = ?, year = ? WHERE id = ?",
+-        params![time.month, time.week, time.year, time.id],
++        "UPDATE time SET zero_day_streak = ?, month = ?, week = ?, year = ? WHERE id = ?",
++        params![time.zero_day_streak, time.month, time.week, time.year, time.id],
+     )?;
+     Ok(())
+ }
+
