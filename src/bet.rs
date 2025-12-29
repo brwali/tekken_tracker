@@ -60,7 +60,7 @@ impl BetOverlord {
     pub fn add_better(&mut self, id: String) {
         self.betters.insert(id);
     }
-    pub fn update_hour_change(&mut self, id: String, amount: f32) {
+    pub fn update_hour_change(&mut self, id: String, amount: f32) { 
         if amount == 0.0 {
             self.hour_change.insert(id, amount);
         }
