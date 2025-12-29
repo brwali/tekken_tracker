@@ -18,9 +18,13 @@ pub struct Time {
     month: u32,
     week: i32,
     year: i32,
+    zero_day_streak: u32
 }
 
 impl Time {
+    pub fn new() -> Self {
+        Time {id: 0, month: 0, week: 0, year: 0, zero_day_streak: 0}
+    }
     pub fn get_month(&self) -> u32 {
         self.month
     }
@@ -30,6 +34,9 @@ impl Time {
     pub fn get_year(&self) -> i32 {
         self.year
     }
+    pub fn get_zero_day_streak(&self) -> u32 {
+        self.zero_day_streak
+    }
     pub fn set_month(&mut self, new_month: u32) {
         self.month = new_month;
     }
@@ -38,6 +45,9 @@ impl Time {
     }
     pub fn set_year(&mut self, new_year: i32) {
         self.year = new_year;
+    }
+    pub fn set_zero_day_streak(&mut self, zero_day_streak: u32) {
+        self.zero_day_streak = zero_day_streak;
     }
 }
 
@@ -164,14 +174,15 @@ pub fn init_db() -> Result<Connection> {
                     id INTEGER PRIMARY KEY,
                     month INTEGER NOT NULL,
                     week INTEGER NOT NULL,
-                    year INTEGER NOT NULL
+                    year INTEGER NOT NULL,
+                    zero_day_streak INTEGER NOT NULL
                 )",
                 [],
             )?;
             // Make sure to check that this is right before deployment lol
             conn.execute(
-                "INSERT INTO time (month, week, year) VALUES (?1, ?2, ?3)",
-                (12, 1, 2025),
+                "INSERT INTO time (month, week, year, zero_day_streak) VALUES (?1, ?2, ?3, ?4)",
+                (12, 1, 2025, 0),
             )?;
     }
     Ok(conn)
@@ -235,6 +246,7 @@ pub fn get_time(conn: &Connection) -> Result<Vec<Time>> {
             month: row.get(1)?,
             week: row.get(2)?,
             year: row.get(3)?,
+            zero_day_streak : row.get(4)?,
         })
     })?;
     let time_wizard: Result<Vec<Time>> = time_collection.collect();
@@ -263,8 +275,8 @@ pub fn get_user(conn: &Connection, id: &str) -> Result<Option<User>> {
 
 pub fn update_time(conn: &Connection, time: Time) -> rusqlite::Result<()> {
     conn.execute(
-        "UPDATE time SET month = ?, week = ?, year = ? WHERE id = ?",
-        params![time.month, time.week, time.year, time.id],
+        "UPDATE time SET zero_day_streak = ?, month = ?, week = ?, year = ? WHERE id = ?",
+        params![time.zero_day_streak, time.month, time.week, time.year, time.id],
     )?;
     Ok(())
 }
