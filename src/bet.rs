@@ -177,3 +177,59 @@ impl BetOverlord {
         return (winner.to_string(), loser.to_string(), ticket_after.get_amount());
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn bet_struct_basics() {
+        let b = Bet::new("a", "b", 3.5);
+        assert_eq!(b.get_user1(), "a");
+        assert_eq!(b.get_user2(), "b");
+        assert!((b.get_amount() - 3.5).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn bet_overlord_basic_flow() {
+        let mut bo = BetOverlord::new();
+        // add betters and relations
+        bo.add_better("A".to_string());
+        bo.add_better("B".to_string());
+        assert!(bo.can_bet("A"));
+        assert!(!bo.can_bet("C"));
+        bo.add_trusted("T".to_string());
+        assert!(bo.is_trusted("T"));
+        // relations and hours
+        bo.add_relation("A".to_string(), "Alice".to_string());
+        bo.add_relation("B".to_string(), "Bob".to_string());
+        bo.update_bet_hours("A".to_string(), 10.0);
+        bo.update_bet_hours("B".to_string(), 10.0);
+        assert!((bo.get_bet_hours("A") - 10.0).abs() < f32::EPSILON);
+        assert!(bo.hour_check("A", "B", 5.0));
+
+        // create a bet
+        let ticket = bo.handle_bet_creation("A".to_string(), "B".to_string(), 5.0);
+        assert_eq!(ticket, 0);
+        // hours deducted
+        assert!((bo.get_bet_hours("A") - 5.0).abs() < f32::EPSILON);
+        assert!((bo.get_bet_hours("B") - 5.0).abs() < f32::EPSILON);
+
+        // list_bets contains ticket info
+        let list = bo.list_bets();
+        assert!(list.contains("Bet number: 0"));
+
+        // cancel bet restores hours
+        let amount = bo.cancel_bet(ticket);
+        assert!((amount - 5.0).abs() < f32::EPSILON);
+        assert!((bo.get_bet_hours("A") - 10.0).abs() < f32::EPSILON);
+
+        // hour change tests
+        bo.update_hour_change("A".to_string(), 2.5);
+        assert!((bo.get_hours_change("A") - 2.5).abs() < f32::EPSILON);
+        bo.update_hour_change("A".to_string(), 1.25);
+        assert!((bo.get_hours_change("A") - 3.75).abs() < f32::EPSILON);
+        bo.update_hour_change("A".to_string(), 0.0);
+        assert!((bo.get_hours_change("A") - 0.0).abs() < f32::EPSILON);
+    }
+}
