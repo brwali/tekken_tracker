@@ -75,7 +75,7 @@ impl EventHandler for Handler {
                 loop {
                     // Run blocking DB logic in spawn_blocking
                     let db_clone = db_connection.clone();
-                    let message = tokio::task::spawn_blocking(move || {
+                    let (message, no_one_played_today) = tokio::task::spawn_blocking(move || {
                         // daily_check must be sync or block_on if async
                         let mut bet_handler = BET_HANDLER.lock().unwrap();
                         tokio::runtime::Handle::current().block_on(daily_task::daily_check(db_clone, &mut *bet_handler))
@@ -83,10 +83,14 @@ impl EventHandler for Handler {
                     .await
                     .expect("spawn_blocking failed");
 
-                    let tree_id = ChannelId::new(1433474989365002342);
-                    let _ = tree_id.say(&http, message.clone()).await;
+                    let tree_id = ChannelId::new(1433474989365002342); 
+                   if let Ok(sent_msg) = tree_id.say(&http, message.clone()).await && no_one_played_today {
+                        let _ = sent_msg.react(&http, crate::ReactionType::Unicode("🧊".to_string())).await;
+                    }
                     let kazoo_id = ChannelId::new(1319106712313135116);
-                    let _ = kazoo_id.say(&http, message.clone()).await;
+                    if let Ok(sent_msg) = kazoo_id.say(&http, message.clone()).await && no_one_played_today {
+                        let _ = sent_msg.react(&http, crate::ReactionType::Unicode("🧊".to_string())).await;
+                    }
 
                     tokio::time::sleep(Duration::from_secs(60 * 60 * 24)).await;
                 }
@@ -240,6 +244,7 @@ impl EventHandler for Handler {
                         let playtime = parts[3].parse::<f32>().unwrap_or(-1.0);
                         let hours_owed = parts[4].parse::<f32>().unwrap_or(-1.0);
                         let steam_id = parts[5].to_string();
+                        let polaris_id = parts[6].to_string();
                         // update the bet handler first
                         // This is bad code btw, I shouldn't be cloning each time I want to pass the value
                         // however, I also don't have time currently to properly fix this prime target for
@@ -248,7 +253,7 @@ impl EventHandler for Handler {
                         BET_HANDLER.lock().unwrap().add_relation(new_wizard.clone(), name.clone());
                         BET_HANDLER.lock().unwrap().update_bet_hours(new_wizard.clone(), 10.0);
                         BET_HANDLER.lock().unwrap().update_hour_change(new_wizard.clone(), 0.0);
-                        let newbie = User::new(new_wizard, name, playtime, hours_owed, steam_id, 0.0, 10.0);
+                        let newbie = User::new(new_wizard, name, playtime, hours_owed, steam_id, 0.0, 10.0, polaris_id, 0);
                         // now update the db
                         {
                             let db = self.db.clone();
@@ -277,6 +282,32 @@ impl EventHandler for Handler {
                             }
                             let _ = msg.channel_id.say(&http, "successfully updated hours").await;
                         }
+                    }
+                    if msg.content.starts_with("!update-user") && (cleaned == brandon_id || cleaned == kwangwon_id) {
+                        let parts: Vec<&str> = msg.content.split_whitespace().collect();
+                        let wizard = parts[1].to_string();
+                        let new_wizard = parse_id(wizard);
+                        let polaris_id = parts[2].to_string();
+                        // now update the db
+                        {
+                            let db = self.db.clone();
+                            let db_connection = db.lock().unwrap();
+                            let _ = db::update_user_column(&db_connection, &polaris_id, &new_wizard).unwrap();
+                        }
+                        // send a success message
+                        let http = ctx.http.clone();
+                        let _ = msg.channel_id.say(&http, "updated user's polaris id").await;
+                    }
+                    if msg.content.starts_with("!user-battles") && (cleaned == brandon_id || cleaned == kwangwon_id) {
+                        dotenv::dotenv().ok();
+                        let ewgf_key = env::var("EWGF_KEY").expect("Expected a token in the environment");
+                        let parts: Vec<&str> = msg.content.split_whitespace().collect();
+                        let polaris_id = parts[1].to_string();
+                        let name = parts[2].to_string();
+                        let stat_message = daily_task::match_analysis(&polaris_id, &ewgf_key, 1.0, &name).await;
+                        // send a success message
+                        let http = ctx.http.clone();
+                        let _ = msg.channel_id.say(&http, stat_message.clone()).await;
                     }
                 }
             }
