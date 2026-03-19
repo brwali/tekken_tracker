@@ -211,7 +211,7 @@ pub fn init_db() -> Result<Connection> {
             // Make sure to check that this is right before deployment lol
             conn.execute(
                 "INSERT INTO time (month, week, year, zero_day_streak) VALUES (?1, ?2, ?3, ?4)",
-                (3, 10, 2026, 0),
+                (3, 2, 2026, 0),
             )?;
     }
     Ok(conn)
@@ -238,8 +238,8 @@ pub fn get_users(conn: &Connection) -> Result<Vec<User>, rusqlite::Error> {
 
 pub fn update_user(conn: &Connection, user: User) -> rusqlite::Result<()> {
     conn.execute(
-        "UPDATE users SET playtime = ?, hours_owed = ?, monthly_hours = ?, bet_hours_available = ?, WHERE id = ?",
-        params![user.playtime, user.hours_owed, user.monthly_hours, user.bet_hours_available, user.id],
+        "UPDATE users SET playtime = ?, hours_owed = ?, monthly_hours = ?, bet_hours_available = ?, played_yesterday = ? WHERE id = ?",
+        params![user.playtime, user.hours_owed, user.monthly_hours, user.bet_hours_available, user.played_yesterday, user.id],
     )?;
     Ok(())
 }

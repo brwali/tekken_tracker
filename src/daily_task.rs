@@ -69,9 +69,9 @@ pub async fn match_analysis(polaris_id: &str, token: &str, daily_playtime: f32, 
             }
             let mut message = String::new();
             if round_count == 0 {
-                message = format!("No games were played within the last 24 hours. This could be the result of the debtor labbing, but do you really believe that they would lab for {} hours :thinking:\n", daily_playtime).to_string();
+                message = format!("No games were played within the last 48 hours. This could be the result of the debtor labbing, or story mode, but do you really believe that they would lab for {} hours :thinking:\n", daily_playtime).to_string();
             } else {
-                message.push_str(&format!("Within the last 24 hours, {} matches were played!! {} wins, {} losses, {} draws\n", win_no + loss_no + draw_no, win_no, loss_no, draw_no));
+                message.push_str(&format!("Within the last 48 hours, {} matches were played!! {} wins, {} losses, {} draws\n", win_no + loss_no + draw_no, win_no, loss_no, draw_no));
                 // Assume 1 round == 1 minute
                 let playtime_percentage = round_after_math((round_count as f32) / round_after_math(daily_playtime / 60.0));
                 if  playtime_percentage < 0.50 && name == "Mason" {
@@ -238,7 +238,10 @@ async fn update_debt_hours(db: Arc<Mutex<Connection>>, bet_handler:&mut BetOverl
                 else {
                     user.set_bet_hours_available(bet_handler.get_bet_hours(&name));
                 }
-                let _ = db::update_user(&db_connection, user.clone());
+                match db::update_user(&db_connection, user.clone()){
+                    Ok(_) => println!("Update successful"),
+                    Err(e) => println!("Update failed: {:?}", e),
+                }
             }
             if total_hours_today > 0.0 {
                 zero_day_streak = 0;
