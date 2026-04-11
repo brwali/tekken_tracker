@@ -71,6 +71,11 @@ impl EventHandler for Handler {
         tokio::spawn({
             let http = ctx.http.clone();
             let db_connection = self.db.clone();
+            // In the unlikely event that too much happens in the message
+            // multiple debotors finish their hours on the same day the
+            // resulting message will be too big and we have to split it up
+            // based on the discord message limit
+            const DISCORD_LIMIT: usize = 2000;
             async move {
                 loop {
                     // Run blocking DB logic in spawn_blocking
@@ -83,13 +88,19 @@ impl EventHandler for Handler {
                     .await
                     .expect("spawn_blocking failed");
 
-                    let tree_id = ChannelId::new(1433474989365002342); 
-                   if let Ok(sent_msg) = tree_id.say(&http, message.clone()).await && no_one_played_today {
-                        let _ = sent_msg.react(&http, crate::ReactionType::Unicode("🧊".to_string())).await;
+                    let tree_id = ChannelId::new(1433474989365002342);
+                    for chunk in message.as_bytes().chunks(DISCORD_LIMIT) {
+                        let chunk_str = std::str::from_utf8(chunk).unwrap_or("Error: Invalid UTF-8");
+                        if let Ok(sent_msg) = tree_id.say(&http, chunk_str).await && no_one_played_today {
+                            let _ = sent_msg.react(&http, crate::ReactionType::Unicode("🧊".to_string())).await;
+                        }
                     }
                     let kazoo_id = ChannelId::new(1319106712313135116);
-                    if let Ok(sent_msg) = kazoo_id.say(&http, message.clone()).await && no_one_played_today {
-                        let _ = sent_msg.react(&http, crate::ReactionType::Unicode("🧊".to_string())).await;
+                    for chunk in message.as_bytes().chunks(DISCORD_LIMIT) {
+                        let chunk_str = std::str::from_utf8(chunk).unwrap_or("Error: Invalid UTF-8");
+                        if let Ok(sent_msg) = kazoo_id.say(&http, chunk_str).await && no_one_played_today {
+                            let _ = sent_msg.react(&http, crate::ReactionType::Unicode("🧊".to_string())).await;
+                        }
                     }
 
                     tokio::time::sleep(Duration::from_secs(60 * 60 * 24)).await;

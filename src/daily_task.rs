@@ -180,6 +180,18 @@ async fn update_debt_hours(db: Arc<Mutex<Connection>>, bet_handler:&mut BetOverl
                             message.push_str(&format!("{} has played {} hours and has {} hours left to go!\nThey have played ZERO tekken hours within the last 24 hours :(\n\n", birth_name, playtime_outer, hours_left));
                         }
                     }
+                    else if playtime_outer >= total_hours {
+                        let body = format!(
+                            ":rocket: {} finally finished playing their {} hours owed!!!!! :rocket:",
+                            birth_name,
+                            total_hours
+                        );
+                        let rocket_unit = ":rocket:";
+                        let border_count = 2*((body.len() + rocket_unit.len()) / rocket_unit.len());
+                        let border = rocket_unit.repeat(border_count);
+                        let vic_message = format!("{}\n{}\n{}\n", border, body, border);
+                        message.push_str(&vic_message);
+                    }
                     else {
                         played_today = true;
                         total_hours_today += daily_playtime;
