@@ -544,8 +544,9 @@ impl EventHandler for Handler {
                         let wizard = parts[1].to_string();
                         let new_wizard = parse_id(wizard);
                         let new_hours = parts[2].parse::<f32>().unwrap_or(-1.0);
+                        let new_monthly = parts[3].parse::<f32>().unwrap_or(-1.0);
                         let http = ctx.http.clone();
-                        if new_hours == -1.0 {
+                        if new_hours == -1.0 || new_monthly == -1.0 {
                             let _ = msg.channel_id.say(&http, "Invalid hour amount").await;
                         } else {
                             // Another instance of the db needing its own scope because we want to send a
@@ -553,9 +554,11 @@ impl EventHandler for Handler {
                             {
                                 let db = self.db.clone();
                                 let db_connection = db.lock().unwrap();
-                                let _ =
-                                    db::update_hours_owed(&db_connection, &new_wizard, new_hours)
-                                        .unwrap();
+                                match db::update_hours_owed(&db_connection, &new_wizard, new_hours, new_monthly) {
+                                    Ok(_) => println!("Update successful"),
+                                    Err(e) => println!("Update failed: {:?}", e),
+                                }
+                                        
                             }
                             let _ = msg
                                 .channel_id

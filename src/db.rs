@@ -355,10 +355,10 @@ pub fn add_user(conn: &Connection, new_user: User) -> rusqlite::Result<()> {
     Ok(())
 }
 
-pub fn update_hours_owed(conn: &Connection, id: &str, hours: f32) -> rusqlite::Result<()> {
+pub fn update_hours_owed(conn: &Connection, id: &str, hours: f32, monthly_hours: f32) -> rusqlite::Result<()> {
     conn.execute(
-        "UPDATE users SET hours_owed = ? WHERE id = ?",
-        params![hours, id],
+        "UPDATE users SET hours_owed = ?, monthly_hours = ? WHERE id = ?",
+        params![hours, monthly_hours, id],
     )?;
     Ok(())
 }
