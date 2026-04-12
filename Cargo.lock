@@ -1739,6 +1739,7 @@ dependencies = [
  "csv",
  "dotenv",
  "once_cell",
+ "rand",
  "reqwest",
  "rusqlite",
  "serde_json",

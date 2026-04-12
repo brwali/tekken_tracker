@@ -1,19 +1,19 @@
-use crate::db;
 use crate::bet;
+use crate::db;
 use crate::db::Time;
-use std::sync::{Arc, Mutex};
-use std::env;
-use reqwest::Client as ReqwestClient;
-use chrono::prelude::*;
-use chrono::Duration;
-use serde_json::Value;
-use rusqlite::Connection;
 use bet::BetOverlord;
+use chrono::Duration;
+use chrono::prelude::*;
+use reqwest::Client as ReqwestClient;
+use rusqlite::Connection;
+use serde_json::Value;
+use std::env;
+use std::sync::{Arc, Mutex};
 
 // Global consts
-const TEKKEN_APP_ID: u64 = 1778820;
+pub const TEKKEN_APP_ID: u64 = 1778820;
 
-async fn get_request(request: &str, token: Option<&str>) -> Option<Value> {
+pub async fn get_request(request: &str, token: Option<&str>) -> Option<Value> {
     let client = ReqwestClient::new();
     let mut req = client.get(request);
     if let Some(auth) = token {
@@ -24,69 +24,89 @@ async fn get_request(request: &str, token: Option<&str>) -> Option<Value> {
     Some(json)
 }
 
-pub async fn match_analysis(polaris_id: &str, token: &str, daily_playtime: f32, name: &str) -> String {
-    let request = format!(
-        "https://api.ewgf.gg/external/battles/{}",
-        polaris_id,
-    );
+pub async fn match_analysis(
+    polaris_id: &str,
+    token: &str,
+    daily_playtime: f32,
+    name: &str,
+) -> String {
+    let request = format!("https://api.ewgf.gg/external/battles/{}", polaris_id,);
     let json_response = get_request(&request, Some(token)).await;
     let now = Utc::now();
     let cutoff = now - Duration::hours(48);
     if let Some(json) = json_response {
         if let Some(data) = json.get("data") {
             if let Ok(battles) = serde_json::from_value::<Vec<Value>>(data.clone()) {
-            let mut win_no = 0;
-            let mut round_count = 0;
-            let mut loss_no = 0;
-            let mut draw_no = 0;
-            for battle in battles {
-                if let Some(battle_at_str) = battle.get("battle_at").and_then(|v| v.as_str()) {
-                    if let Ok(battle_at) = DateTime::parse_from_rfc3339(battle_at_str) {
-                        if battle_at > cutoff {
-                            let cleaned_polaris_id = polaris_id.replace("-", "");
-                            let winner = battle.get("winner").and_then(|v| v.as_u64()).unwrap_or(0);
-                            let winner_id;
-                            if winner == 1 {
-                                winner_id =  battle.get("p1_tekken_id").and_then(|v| v.as_str()).unwrap_or("");
-                            } else if winner == 2 {
-                                winner_id = battle.get("p2_tekken_id").and_then(|v| v.as_str()).unwrap_or("");
-                            } else {
-                                winner_id = "Draw";
-                            }
-                            let p1_rounds = battle.get("p1_rounds_won").and_then(|v| v.as_u64()).unwrap_or(0);
-                            let p2_rounds = battle.get("p2_rounds_won").and_then(|v| v.as_u64()).unwrap_or(0);
-                            round_count += p1_rounds + p2_rounds;
-                            if winner_id == cleaned_polaris_id {
-                                win_no += 1;
-                            } else if winner_id == "Draw" {
-                                draw_no += 1;
-                            } else {
-                                loss_no += 1;
+                let mut win_no = 0;
+                let mut round_count = 0;
+                let mut loss_no = 0;
+                let mut draw_no = 0;
+                for battle in battles {
+                    if let Some(battle_at_str) = battle.get("battle_at").and_then(|v| v.as_str()) {
+                        if let Ok(battle_at) = DateTime::parse_from_rfc3339(battle_at_str) {
+                            if battle_at > cutoff {
+                                let cleaned_polaris_id = polaris_id.replace("-", "");
+                                let winner =
+                                    battle.get("winner").and_then(|v| v.as_u64()).unwrap_or(0);
+                                let winner_id;
+                                if winner == 1 {
+                                    winner_id = battle
+                                        .get("p1_tekken_id")
+                                        .and_then(|v| v.as_str())
+                                        .unwrap_or("");
+                                } else if winner == 2 {
+                                    winner_id = battle
+                                        .get("p2_tekken_id")
+                                        .and_then(|v| v.as_str())
+                                        .unwrap_or("");
+                                } else {
+                                    winner_id = "Draw";
+                                }
+                                let p1_rounds = battle
+                                    .get("p1_rounds_won")
+                                    .and_then(|v| v.as_u64())
+                                    .unwrap_or(0);
+                                let p2_rounds = battle
+                                    .get("p2_rounds_won")
+                                    .and_then(|v| v.as_u64())
+                                    .unwrap_or(0);
+                                round_count += p1_rounds + p2_rounds;
+                                if winner_id == cleaned_polaris_id {
+                                    win_no += 1;
+                                } else if winner_id == "Draw" {
+                                    draw_no += 1;
+                                } else {
+                                    loss_no += 1;
+                                }
                             }
                         }
                     }
                 }
-            }
-            let mut message = String::new();
-            if round_count == 0 {
-                message = format!("No games were played within the last 48 hours. This could be the result of the debtor labbing, or story mode, but do you really believe that they would lab for {} hours :thinking:\n", daily_playtime).to_string();
-            } else {
-                message.push_str(&format!("Within the last 48 hours, {} matches were played!! {} wins, {} losses, {} draws\n", win_no + loss_no + draw_no, win_no, loss_no, draw_no));
-                // Assume 1 round == 1 minute
-                let playtime_percentage = round_after_math((round_count as f32) / round_after_math(daily_playtime / 60.0));
-                if  playtime_percentage < 0.50 && name == "Mason" {
-                    message.push_str(&format!("Using our advanced analytical algorithm :) the debtor did not meet the normal playtime threshold.\n\
+                let mut message = String::new();
+                if round_count == 0 {
+                    message = format!("No games were played within the last 48 hours. This could be the result of the debtor labbing, or story mode, but do you really believe that they would lab for {} hours :thinking:\n", daily_playtime).to_string();
+                } else {
+                    message.push_str(&format!("Within the last 48 hours, {} matches were played!! {} wins, {} losses, {} draws\n", win_no + loss_no + draw_no, win_no, loss_no, draw_no));
+                    // Assume 1 round == 1 minute
+                    let playtime_percentage = round_after_math(
+                        (round_count as f32) / round_after_math(daily_playtime / 60.0),
+                    );
+                    if playtime_percentage < 0.50 && name == "Mason" {
+                        message.push_str(&format!("Using our advanced analytical algorithm :) the debtor did not meet the normal playtime threshold.\n\
                     This could be the result of afk'd hours, labbing, or waiting in a custom lobby. The Tekken Bank would like to give the benefit of the doubt, but given past behavior of this debtor we have flagged this tekken session.\n"));
+                    }
                 }
+                return message;
             }
-            return message;
         }
     }
-}
     "Failed to fetch or parse battles.\n".to_string()
 }
 
-async fn update_debt_hours(db: Arc<Mutex<Connection>>, bet_handler:&mut BetOverlord) -> (String, bool) {
+async fn update_debt_hours(
+    db: Arc<Mutex<Connection>>,
+    bet_handler: &mut BetOverlord,
+) -> (String, bool) {
     dotenv::dotenv().ok();
     let api_key = env::var("API_KEY").expect("Expected a token in the environment");
     let ewgf_key = env::var("EWGF_KEY").expect("Expected a token in the environment");
@@ -112,8 +132,7 @@ async fn update_debt_hours(db: Arc<Mutex<Connection>>, bet_handler:&mut BetOverl
                 if week == 7 {
                     t.set_week(1);
                     new_week = true;
-                }
-                else {
+                } else {
                     let bumped = week + 1;
                     t.set_week(bumped);
                 }
@@ -145,21 +164,23 @@ async fn update_debt_hours(db: Arc<Mutex<Connection>>, bet_handler:&mut BetOverl
                 if hours < total_hours {
                     let request = format!(
                         "https://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/?key={}&steamid={}&format=json",
-                        api_key,
-                        steam_id,
+                        api_key, steam_id,
                     );
                     if let Some(json) = get_request(&request, None).await {
                         // Safely get the games array
-                        if let Some(games) = json.get("response")
-                                                .and_then(|r| r.get("games"))
-                                                .and_then(|g| g.as_array()) {
+                        if let Some(games) = json
+                            .get("response")
+                            .and_then(|r| r.get("games"))
+                            .and_then(|g| g.as_array())
+                        {
                             if let Some(tekken_game) = games.iter().find(|game| {
                                 game.get("appid").and_then(|id| id.as_u64()) == Some(TEKKEN_APP_ID)
                             }) {
                                 // Get playtime_forever in minutes
-                                let playtime = tekken_game.get("playtime_forever")
-                                                        .and_then(|p| p.as_u64())
-                                                        .unwrap_or(0);
+                                let playtime = tekken_game
+                                    .get("playtime_forever")
+                                    .and_then(|p| p.as_u64())
+                                    .unwrap_or(0);
                                 playtime_outer = ((playtime as f32 / 60.0) * 100.0).trunc() / 100.0;
                                 // Convert to hours for readability
                             } else {
@@ -175,24 +196,21 @@ async fn update_debt_hours(db: Arc<Mutex<Connection>>, bet_handler:&mut BetOverl
                     if hours == playtime_outer {
                         if new_week {
                             message.push_str(&format!("<@{}> has played {} hours and has {} hours left to go!\nThey have played ZERO tekken hours within the last 24 hours :(\n", name, playtime_outer, hours_left));
-                        }
-                        else {
+                        } else {
                             message.push_str(&format!("{} has played {} hours and has {} hours left to go!\nThey have played ZERO tekken hours within the last 24 hours :(\n\n", birth_name, playtime_outer, hours_left));
                         }
-                    }
-                    else if playtime_outer >= total_hours {
+                    } else if playtime_outer >= total_hours {
                         let body = format!(
                             ":rocket: {} finally finished playing their {} hours owed!!!!! :rocket:",
-                            birth_name,
-                            total_hours
+                            birth_name, total_hours
                         );
                         let rocket_unit = ":rocket:";
-                        let border_count = 2*((body.len() + rocket_unit.len()) / rocket_unit.len());
+                        let border_count =
+                            2 * ((body.len() + rocket_unit.len()) / rocket_unit.len());
                         let border = rocket_unit.repeat(border_count);
                         let vic_message = format!("{}\n{}\n{}\n", border, body, border);
                         message.push_str(&vic_message);
-                    }
-                    else {
+                    } else {
                         played_today = true;
                         total_hours_today += daily_playtime;
                         user.set_playtime(playtime_outer);
@@ -200,15 +218,20 @@ async fn update_debt_hours(db: Arc<Mutex<Connection>>, bet_handler:&mut BetOverl
                         user.set_monthly_hours(round_after_math(monthly_hours + daily_playtime));
                         if new_week {
                             message.push_str(&format!("<@{}> has played {} hours and has {} hours left to go!\nThey have played {} tekken hours since last time, way to go :D!!!\n", name, playtime_outer, hours_left, daily_playtime));
-                        }
-                        else {
+                        } else {
                             message.push_str(&format!("{} has played {} hours and has {} hours left to go!\nThey have played {} tekken hours since last time, way to go :D!!!\n\n", birth_name, playtime_outer, hours_left, daily_playtime));
                         }
                     }
                     // Due to API restraints we can only get matches with a 24 hour delay
                     // so if they played yesterday get match history
                     if user.get_played_yesterday() == 1 {
-                        let matches = match_analysis(user.get_polar_id(), &ewgf_key, daily_playtime, &birth_name).await;
+                        let matches = match_analysis(
+                            user.get_polar_id(),
+                            &ewgf_key,
+                            daily_playtime,
+                            &birth_name,
+                        )
+                        .await;
                         message.push_str(&matches);
                         message.push_str("\n");
                         user.set_played_yesterday(0);
@@ -239,29 +262,42 @@ async fn update_debt_hours(db: Arc<Mutex<Connection>>, bet_handler:&mut BetOverl
                         change = "lost";
                     };
                     if hours_earned == 0.0 {
-                        message.push_str(&format!("This week {} has not engaged in any bets.\n\n", birth_name));
+                        message.push_str(&format!(
+                            "This week {} has not engaged in any bets.\n\n",
+                            birth_name
+                        ));
                     } else {
-                        message.push_str(&format!("This week {} has {} {} hours through bets.\n\n", birth_name, change, hours_earned));
+                        message.push_str(&format!(
+                            "This week {} has {} {} hours through bets.\n\n",
+                            birth_name, change, hours_earned
+                        ));
                     }
                     bet_handler.update_bet_hours(name.to_string(), 10.0);
                     user.set_bet_hours_available(10.0);
                     bet_handler.update_hour_change(name, 0.0);
-                }
-                else {
+                } else {
                     user.set_bet_hours_available(bet_handler.get_bet_hours(&name));
                 }
-                match db::update_user(&db_connection, user.clone()){
+                match db::update_user(&db_connection, user.clone()) {
                     Ok(_) => println!("Update successful"),
                     Err(e) => println!("Update failed: {:?}", e),
                 }
             }
             if total_hours_today > 0.0 {
                 zero_day_streak = 0;
-                message.push_str(&format!("The debtors have played {} hours of tekken today! POG\n\n", total_hours_today));
+                message.push_str(&format!(
+                    "The debtors have played {} hours of tekken today! POG\n\n",
+                    total_hours_today
+                ));
             } else {
                 zero_day_streak += 1;
-                message.push_str(&format!("The debtors have played ZERO hours of tekken today.\n\n"));
-                message.push_str(&format!("It has been {} days since any tekken has been played.\n\n", zero_day_streak));
+                message.push_str(&format!(
+                    "The debtors have played ZERO hours of tekken today.\n\n"
+                ));
+                message.push_str(&format!(
+                    "It has been {} days since any tekken has been played.\n\n",
+                    zero_day_streak
+                ));
             }
         }
         Err(e) => {
@@ -274,7 +310,10 @@ async fn update_debt_hours(db: Arc<Mutex<Connection>>, bet_handler:&mut BetOverl
     (message, total_hours_today == 0.0)
 }
 
-pub async fn daily_check(db: Arc<Mutex<Connection>>, bet_handler:&mut BetOverlord) -> (String, bool) {
+pub async fn daily_check(
+    db: Arc<Mutex<Connection>>,
+    bet_handler: &mut BetOverlord,
+) -> (String, bool) {
     let (message, no_one_played_today) = update_debt_hours(db.clone(), bet_handler).await;
     (message, no_one_played_today)
 }

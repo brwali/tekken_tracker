@@ -1,8 +1,8 @@
-use crate::db;
 use crate::daily_task;
-use std::sync::{Arc, Mutex};
+use crate::db;
 use rusqlite::Connection;
-use std::collections::{HashSet, HashMap};
+use std::collections::{HashMap, HashSet};
+use std::sync::{Arc, Mutex};
 
 #[derive(Clone)]
 pub struct Bet {
@@ -63,8 +63,7 @@ impl BetOverlord {
     pub fn update_hour_change(&mut self, id: String, amount: f32) {
         if amount == 0.0 {
             self.hour_change.insert(id, amount);
-        }
-        else {
+        } else {
             let prev = self.hour_change.get(&id);
             let new_value = match prev {
                 Some(&val) => daily_task::round_after_math(val + amount),
@@ -94,11 +93,13 @@ impl BetOverlord {
         for (ticket_no, bet) in binding.iter() {
             let name1 = self.name_relation.get(bet.get_user1());
             let name2 = self.name_relation.get(bet.get_user2());
-            message.push_str(
-                &format!("Bet number: {} - debtor one: {} debtor two: {} - bet amount: {}\n",
-                    ticket_no, name1.map_or("mystery man", |v| v), name2.map_or("mystery man", |v| v), bet.get_amount()
-                )
-            );
+            message.push_str(&format!(
+                "Bet number: {} - debtor one: {} debtor two: {} - bet amount: {}\n",
+                ticket_no,
+                name1.map_or("mystery man", |v| v),
+                name2.map_or("mystery man", |v| v),
+                bet.get_amount()
+            ));
         }
         message
     }
@@ -137,14 +138,21 @@ impl BetOverlord {
         let amount = ticket_after.get_amount();
         let id1 = ticket_after.get_user1().to_string();
         let id2 = ticket_after.get_user2().to_string();
-        let p1_hours = daily_task::round_after_math(self.hours_available.get(&id1).unwrap() + amount);
-        let p2_hours = daily_task::round_after_math(self.hours_available.get(&id2).unwrap() + amount);
+        let p1_hours =
+            daily_task::round_after_math(self.hours_available.get(&id1).unwrap() + amount);
+        let p2_hours =
+            daily_task::round_after_math(self.hours_available.get(&id2).unwrap() + amount);
         let _ = self.update_bet_hours(id1, p1_hours);
         let _ = self.update_bet_hours(id2, p2_hours);
         amount
     }
 
-    pub fn handle_bet_resolution(&mut self, db: Arc<Mutex<Connection>>, ticket_no: i32, winner: String) -> (String, String, f32) {
+    pub fn handle_bet_resolution(
+        &mut self,
+        db: Arc<Mutex<Connection>>,
+        ticket_no: i32,
+        winner: String,
+    ) -> (String, String, f32) {
         let ticket_after;
         {
             let mut binding = self.bet_house.lock().unwrap();
@@ -169,11 +177,21 @@ impl BetOverlord {
         let loser;
         if winner == ticket_after.get_user1() {
             loser = ticket_after.get_user2();
-            self.update_hour_change(ticket_after.get_user2().to_string(), ticket_after.get_amount());
-        }else {
+            self.update_hour_change(
+                ticket_after.get_user2().to_string(),
+                ticket_after.get_amount(),
+            );
+        } else {
             loser = ticket_after.get_user1();
-            self.update_hour_change(ticket_after.get_user1().to_string(), ticket_after.get_amount());
+            self.update_hour_change(
+                ticket_after.get_user1().to_string(),
+                ticket_after.get_amount(),
+            );
         }
-        return (winner.to_string(), loser.to_string(), ticket_after.get_amount());
+        return (
+            winner.to_string(),
+            loser.to_string(),
+            ticket_after.get_amount(),
+        );
     }
 }

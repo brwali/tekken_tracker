@@ -1,7 +1,7 @@
 use rusqlite::{Connection, Result, params};
 use std::env;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct User {
     id: String,
     name: String,
@@ -11,7 +11,7 @@ pub struct User {
     monthly_hours: f32,
     bet_hours_available: f32,
     polaris_id: String,
-    played_yesterday: i32
+    played_yesterday: i32,
 }
 
 #[derive(Clone)]
@@ -20,12 +20,18 @@ pub struct Time {
     month: u32,
     week: i32,
     year: i32,
-    zero_day_streak: u32
+    zero_day_streak: u32,
 }
 
 impl Time {
     pub fn new() -> Self {
-        Time {id: 0, month: 0, week: 0, year: 0, zero_day_streak: 0}
+        Time {
+            id: 0,
+            month: 0,
+            week: 0,
+            year: 0,
+            zero_day_streak: 0,
+        }
     }
     pub fn get_month(&self) -> u32 {
         self.month
@@ -121,7 +127,8 @@ impl User {
 pub fn init_db() -> Result<Connection> {
     let conn = Connection::open("data.db")?;
     {
-        let mut stmt = conn.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='users'")?;
+        let mut stmt =
+            conn.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='users'")?;
         let table_exists = stmt.exists([])?;
         if !table_exists {
             conn.execute(
@@ -176,43 +183,49 @@ pub fn init_db() -> Result<Connection> {
         }
         // DB migration statements
         let mut stmt = conn.prepare("PRAGMA table_info(users)")?;
-        let columns: Vec<String> = stmt.query_map([], |row| {
-            let name: String = row.get(1)?;
-            Ok(name)
-        })?.collect::<Result<Vec<_>>>()?;
+        let columns: Vec<String> = stmt
+            .query_map([], |row| {
+                let name: String = row.get(1)?;
+                Ok(name)
+            })?
+            .collect::<Result<Vec<_>>>()?;
 
         if !columns.contains(&"polaris_id".to_string()) {
-            conn.execute("ALTER TABLE users ADD COLUMN polaris_id TEXT NOT NULL DEFAULT ''", [])?;
+            conn.execute(
+                "ALTER TABLE users ADD COLUMN polaris_id TEXT NOT NULL DEFAULT ''",
+                [],
+            )?;
         }
         if !columns.contains(&"played_yesterday".to_string()) {
-            conn.execute("ALTER TABLE users ADD COLUMN played_yesterday INT NOT NULL DEFAULT 0", [])?;
+            conn.execute(
+                "ALTER TABLE users ADD COLUMN played_yesterday INT NOT NULL DEFAULT 0",
+                [],
+            )?;
         }
         // Every time the db get intitalized it means that we are updating the bot
         // the update may not happen in a single day so its better to be able to control
         // the day counter whenever we choose to launch the bot
-        let mut stmt = conn.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='time'")?;
+        let mut stmt =
+            conn.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='time'")?;
         let table_exists = stmt.exists([])?;
         if table_exists {
-            conn.execute(
-                "DROP TABLE time",
-                [],
-            )?;
+            conn.execute("DROP TABLE time", [])?;
         }
         conn.execute(
-                "CREATE TABLE IF NOT EXISTS time (
+            "CREATE TABLE IF NOT EXISTS time (
                     id INTEGER PRIMARY KEY,
                     month INTEGER NOT NULL,
                     week INTEGER NOT NULL,
                     year INTEGER NOT NULL,
                     zero_day_streak INTEGER NOT NULL
                 )",
-                [],
-            )?;
-            // Make sure to check that this is right before deployment lol
-            conn.execute(
-                "INSERT INTO time (month, week, year, zero_day_streak) VALUES (?1, ?2, ?3, ?4)",
-                (3, 2, 2026, 0),
-            )?;
+            [],
+        )?;
+        // Make sure to check that this is right before deployment lol
+        conn.execute(
+            "INSERT INTO time (month, week, year, zero_day_streak) VALUES (?1, ?2, ?3, ?4)",
+            (4, 2, 2026, 0),
+        )?;
     }
     Ok(conn)
 }
@@ -244,7 +257,11 @@ pub fn update_user(conn: &Connection, user: User) -> rusqlite::Result<()> {
     Ok(())
 }
 // This function exists so that I can manually update columns
-pub fn update_user_column(conn: &Connection, polaris_id: &str, user_id: &str) -> rusqlite::Result<()> {
+pub fn update_user_column(
+    conn: &Connection,
+    polaris_id: &str,
+    user_id: &str,
+) -> rusqlite::Result<()> {
     conn.execute(
         "UPDATE users SET polaris_id = ? WHERE id = ?",
         params![polaris_id, user_id],
@@ -287,7 +304,7 @@ pub fn get_time(conn: &Connection) -> Result<Vec<Time>> {
             month: row.get(1)?,
             week: row.get(2)?,
             year: row.get(3)?,
-            zero_day_streak : row.get(4)?,
+            zero_day_streak: row.get(4)?,
         })
     })?;
     let time_wizard: Result<Vec<Time>> = time_collection.collect();
@@ -319,7 +336,13 @@ pub fn get_user(conn: &Connection, id: &str) -> Result<Option<User>> {
 pub fn update_time(conn: &Connection, time: Time) -> rusqlite::Result<()> {
     conn.execute(
         "UPDATE time SET zero_day_streak = ?, month = ?, week = ?, year = ? WHERE id = ?",
-        params![time.zero_day_streak, time.month, time.week, time.year, time.id],
+        params![
+            time.zero_day_streak,
+            time.month,
+            time.week,
+            time.year,
+            time.id
+        ],
     )?;
     Ok(())
 }

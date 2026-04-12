@@ -1,33 +1,40 @@
-mod db;
-mod daily_task;
 mod bet;
+mod daily_task;
+mod db;
 use crate::db::User;
-use serenity::prelude::*;
-use serenity::model::prelude::*;
-use serenity::Client;
+use chrono::Utc;
 use once_cell::sync::Lazy;
-use std::sync::{Arc, Mutex};
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::env;
-use tokio::time::Duration;
+use rand::Rng;
 use rusqlite::Connection;
+use serenity::Client;
+use serenity::model::prelude::*;
+use serenity::prelude::*;
+use std::collections::HashMap;
+use std::env;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
+use tokio::time::Duration;
 
 struct Handler {
     db: Arc<Mutex<Connection>>,
 }
 
-static BET_HANDLER: Lazy<Mutex<bet::BetOverlord>> = Lazy::new(|| {
-    Mutex::new(bet::BetOverlord::new())
-});
+static BET_HANDLER: Lazy<Mutex<bet::BetOverlord>> =
+    Lazy::new(|| Mutex::new(bet::BetOverlord::new()));
 
 static DAILY_TASK_SPAWNED: AtomicBool = AtomicBool::new(false);
+static ACTIVE_VOICE_TASKS: Lazy<Mutex<HashMap<UserId, Arc<AtomicBool>>>> =
+    Lazy::new(|| Mutex::new(HashMap::new()));
+
+const TREE_CHANNEL_ID: u64 = 1433474989365002342;
+const KAZOO_CHANNEL_ID: u64 = 1319106712313135116;
 
 fn parse_id(id: String) -> String {
     let parsed_id = id
-            .trim_start_matches('<')
-            .trim_end_matches('>')
-            .strip_prefix('@')
-            .unwrap_or("Bad request");
+        .trim_start_matches('<')
+        .trim_end_matches('>')
+        .strip_prefix('@')
+        .unwrap_or("Bad request");
     return parsed_id.to_string();
 }
 
@@ -36,13 +43,31 @@ fn setup_betting_manager(db: Arc<Mutex<Connection>>) {
     match db::get_users(&db_connection) {
         Ok(users) => {
             for user in &users {
-                BET_HANDLER.lock().unwrap().add_better(user.get_id().to_string());
-                BET_HANDLER.lock().unwrap().add_relation(user.get_id().to_string(), user.get_name().to_string());
-                BET_HANDLER.lock().unwrap().update_bet_hours(user.get_id().to_string(), 10.0);
-                BET_HANDLER.lock().unwrap().update_hour_change(user.get_id().to_string(), 0.0);
+                BET_HANDLER
+                    .lock()
+                    .unwrap()
+                    .add_better(user.get_id().to_string());
+                BET_HANDLER
+                    .lock()
+                    .unwrap()
+                    .add_relation(user.get_id().to_string(), user.get_name().to_string());
+                BET_HANDLER
+                    .lock()
+                    .unwrap()
+                    .update_bet_hours(user.get_id().to_string(), 10.0);
+                BET_HANDLER
+                    .lock()
+                    .unwrap()
+                    .update_hour_change(user.get_id().to_string(), 0.0);
                 // Not ideal but for the time being should work, should probably be a schema change
-                if user.get_name() == "Kwangwon" || user.get_name() == "Brandon" || user.get_name() == "Daniel" {
-                    BET_HANDLER.lock().unwrap().add_trusted(user.get_id().to_string());
+                if user.get_name() == "Kwangwon"
+                    || user.get_name() == "Brandon"
+                    || user.get_name() == "Daniel"
+                {
+                    BET_HANDLER
+                        .lock()
+                        .unwrap()
+                        .add_trusted(user.get_id().to_string());
                 }
             }
         }
@@ -54,10 +79,11 @@ fn setup_betting_manager(db: Arc<Mutex<Connection>>) {
 
 #[serenity::async_trait]
 impl EventHandler for Handler {
-
     async fn ready(&self, ctx: Context, _data: Ready) {
-
-        if DAILY_TASK_SPAWNED.compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst).is_err() {
+        if DAILY_TASK_SPAWNED
+            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+            .is_err()
+        {
             // already started
             return;
         }
@@ -83,27 +109,184 @@ impl EventHandler for Handler {
                     let (message, no_one_played_today) = tokio::task::spawn_blocking(move || {
                         // daily_check must be sync or block_on if async
                         let mut bet_handler = BET_HANDLER.lock().unwrap();
-                        tokio::runtime::Handle::current().block_on(daily_task::daily_check(db_clone, &mut *bet_handler))
+                        tokio::runtime::Handle::current()
+                            .block_on(daily_task::daily_check(db_clone, &mut *bet_handler))
                     })
                     .await
                     .expect("spawn_blocking failed");
 
-                    let tree_id = ChannelId::new(1433474989365002342);
+                    let tree_id = ChannelId::new(TREE_CHANNEL_ID);
                     for chunk in message.as_bytes().chunks(DISCORD_LIMIT) {
-                        let chunk_str = std::str::from_utf8(chunk).unwrap_or("Error: Invalid UTF-8");
-                        if let Ok(sent_msg) = tree_id.say(&http, chunk_str).await && no_one_played_today {
-                            let _ = sent_msg.react(&http, crate::ReactionType::Unicode("🧊".to_string())).await;
+                        let chunk_str =
+                            std::str::from_utf8(chunk).unwrap_or("Error: Invalid UTF-8");
+                        if let Ok(sent_msg) = tree_id.say(&http, chunk_str).await
+                            && no_one_played_today
+                        {
+                            let _ = sent_msg
+                                .react(&http, crate::ReactionType::Unicode("🧊".to_string()))
+                                .await;
                         }
                     }
-                    let kazoo_id = ChannelId::new(1319106712313135116);
+                    let kazoo_id = ChannelId::new(KAZOO_CHANNEL_ID);
                     for chunk in message.as_bytes().chunks(DISCORD_LIMIT) {
-                        let chunk_str = std::str::from_utf8(chunk).unwrap_or("Error: Invalid UTF-8");
-                        if let Ok(sent_msg) = kazoo_id.say(&http, chunk_str).await && no_one_played_today {
-                            let _ = sent_msg.react(&http, crate::ReactionType::Unicode("🧊".to_string())).await;
+                        let chunk_str =
+                            std::str::from_utf8(chunk).unwrap_or("Error: Invalid UTF-8");
+                        if let Ok(sent_msg) = kazoo_id.say(&http, chunk_str).await
+                            && no_one_played_today
+                        {
+                            let _ = sent_msg
+                                .react(&http, crate::ReactionType::Unicode("🧊".to_string()))
+                                .await;
                         }
                     }
 
                     tokio::time::sleep(Duration::from_secs(60 * 60 * 24)).await;
+                }
+            }
+        });
+    }
+
+    async fn voice_state_update(&self, ctx: Context, old: Option<VoiceState>, new: VoiceState) {
+        let old_channel = old.and_then(|state| state.channel_id);
+        let new_channel = new.channel_id;
+        if new_channel.is_none() && old_channel.is_some() {
+            let user_id = new.user_id;
+            if let Ok(mut tasks) = ACTIVE_VOICE_TASKS.lock() {
+                if let Some(should_exit) = tasks.remove(&user_id) {
+                    should_exit.store(true, Ordering::SeqCst);
+                }
+            }
+            return;
+        }
+        let joined_or_moved = new_channel.is_some() && old_channel != new_channel;
+        if !joined_or_moved {
+            return;
+        }
+        let guild_id = if let Some(guild_id) = new.guild_id {
+            guild_id
+        } else {
+            return;
+        };
+        let bet_handler = BET_HANDLER.lock().unwrap();
+        let user_id = new.user_id.to_string();
+        let is_better = bet_handler.can_bet(&user_id);
+        if !is_better {
+            // bail if the user isn't in the system so we can avoid a db call
+            return;
+        }
+        let db_clone = self.db.clone();
+        let db_connection = db_clone.lock().unwrap();
+        let joined_user;
+        match db::get_user(&db_connection, &user_id.to_string()) {
+            Ok(user) => match user {
+                Some(user) => joined_user = user,
+                None => return,
+            },
+            Err(_e) => return,
+        }
+        let owes_hours = joined_user.get_playtime() < joined_user.get_hours_owed();
+        let steam_id = joined_user.get_steamid().to_string();
+
+        if !owes_hours {
+            return;
+        }
+        let monthly_hours = joined_user.get_monthly_hours();
+
+        if monthly_hours >= 5.0 {
+            return;
+        }
+        tokio::spawn({
+            let http = ctx.http.clone();
+            let user_id_clone = user_id.clone();
+            let new_id_clone = new.user_id.clone();
+            let guild_id_clone = guild_id.clone();
+            let member = new.member.clone();
+            let steam_id_clone = steam_id.clone();
+
+            let should_exit = Arc::new(AtomicBool::new(false));
+            {
+                if let Ok(mut tasks) = ACTIVE_VOICE_TASKS.lock() {
+                    tasks.insert(new_id_clone, should_exit.clone());
+                }
+            }
+            async move {
+                loop {
+                    let coin_flip_won = !rand::thread_rng().gen_bool(0.5);
+                    tokio::time::sleep(Duration::from_secs(60 * 60)).await;
+                    if should_exit.load(Ordering::SeqCst) {
+                        break;
+                    }
+
+                    dotenv::dotenv().ok();
+                    let api_key = env::var("API_KEY").expect("Expected a token in the environment");
+                    let steam_uri = format!(
+                        "https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key={}&steamids={}",
+                        api_key, steam_id_clone
+                    );
+                    if let Some(json) = daily_task::get_request(&steam_uri, None).await {
+                        if let Some(response) = json
+                            .get("response")
+                            .and_then(|r| r.get("players"))
+                            .and_then(|p| p.get(0))
+                        {
+                            if let Some(gameid_str) =
+                                response.get("gameid").and_then(|g| g.as_str())
+                            {
+                                if gameid_str.parse::<u64>().ok() == Some(daily_task::TEKKEN_APP_ID)
+                                {
+                                    // If we got here they are playing tekken and there is no need to boot them
+                                    println!("tekken time");
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    if coin_flip_won {
+                        let notice = format!(
+                            "<@{}> won the coin flip, no timeout this time.",
+                            user_id_clone
+                        );
+                        if guild_id_clone == 629110552983109632 {
+                            let tree_id = ChannelId::new(TREE_CHANNEL_ID);
+                            let _ = tree_id.say(&http, notice).await;
+                        } else {
+                            let kazoo_id = ChannelId::new(KAZOO_CHANNEL_ID);
+                            let _ = kazoo_id.say(&http, notice).await;
+                        }
+                    } else {
+                        // Chance passed - timeout user for 5 minute
+                        if let Some(mut member) = member {
+                            let _ = member.disconnect_from_voice(&http).await;
+                            let timeout_duration = std::time::Duration::from_secs(5 * 60);
+                            let timestamp = Timestamp::from_unix_timestamp(
+                                (Utc::now()
+                                    + chrono::Duration::from_std(timeout_duration).unwrap())
+                                .timestamp(),
+                            )
+                            .unwrap();
+                            let _ = member
+                                .disable_communication_until_datetime(&http, timestamp)
+                                .await;
+                            let notice = format!(
+                                "<@{}> owes hours and failed the coinflip so they got disconnected from voice.",
+                                user_id_clone
+                            );
+                            if guild_id_clone == 629110552983109632 {
+                                let tree_id = ChannelId::new(TREE_CHANNEL_ID);
+                                let _ = tree_id.say(&ctx.http, notice).await;
+                            } else {
+                                let kazoo_id = ChannelId::new(KAZOO_CHANNEL_ID);
+                                let _ = kazoo_id.say(&ctx.http, notice).await;
+                            }
+                        }
+                        // Clean up
+                        if let Ok(mut tasks) = ACTIVE_VOICE_TASKS.lock() {
+                            tasks.remove(&new_id_clone);
+                        }
+
+                        // Exit loop after applying timeout
+                        break;
+                    }
                 }
             }
         });
@@ -116,68 +299,120 @@ impl EventHandler for Handler {
                 if guild_channel.name == "tekken" {
                     let author = msg.author.to_string();
                     let cleaned = parse_id(author);
-                    if msg.content.starts_with("!bet") && BET_HANDLER.lock().unwrap().can_bet(&cleaned) {
+                    if msg.content.starts_with("!bet")
+                        && BET_HANDLER.lock().unwrap().can_bet(&cleaned)
+                    {
                         let parts: Vec<&str> = msg.content.split_whitespace().collect();
                         let bet_amount = parts[2].parse::<f32>().unwrap_or(-1.0);
                         // after parsing the bet_amount first check that its a legal value
                         if bet_amount <= 0.0 || bet_amount > 10.0 {
-                            let _ = msg.channel_id.say(&ctx.http, "Incorrect bet value, please try again".to_string()).await;
+                            let _ = msg
+                                .channel_id
+                                .say(
+                                    &ctx.http,
+                                    "Incorrect bet value, please try again".to_string(),
+                                )
+                                .await;
                         } else {
                             // If it is legal now start to parse the rest of the command
                             let bet_recp = parts[1].to_string();
                             let parsed_bet_recp = parse_id(bet_recp);
                             if cleaned == "Bad request" || parsed_bet_recp == "Bad request" {
-                                let _ = msg.channel_id.say(&ctx.http, "Invalid users entered, please try again".to_string()).await;
+                                let _ = msg
+                                    .channel_id
+                                    .say(
+                                        &ctx.http,
+                                        "Invalid users entered, please try again".to_string(),
+                                    )
+                                    .await;
                             } else {
                                 // We now know all the values that were entered have been entered correctly, so now
                                 // we need to check if the users are eligble to bet and also that they have the correct
                                 // amount of hours to place the bet
-                                if BET_HANDLER.lock().unwrap().can_bet(&parsed_bet_recp) && BET_HANDLER.lock().unwrap().hour_check(&cleaned, &parsed_bet_recp, bet_amount) {
-                                    let ticket_no = BET_HANDLER.lock().unwrap().handle_bet_creation(cleaned.to_string(), parsed_bet_recp.to_string(), bet_amount);
+                                if BET_HANDLER.lock().unwrap().can_bet(&parsed_bet_recp)
+                                    && BET_HANDLER.lock().unwrap().hour_check(
+                                        &cleaned,
+                                        &parsed_bet_recp,
+                                        bet_amount,
+                                    )
+                                {
+                                    let ticket_no =
+                                        BET_HANDLER.lock().unwrap().handle_bet_creation(
+                                            cleaned.to_string(),
+                                            parsed_bet_recp.to_string(),
+                                            bet_amount,
+                                        );
                                     let _ = msg.channel_id.say(&ctx.http, format!("Bet successfully submitted, your bet number is {}\n",ticket_no.to_string())).await;
-                                }
-                                else {
-                                    let _ = msg.channel_id.say(&ctx.http, "Error forming the ticket :/".to_string()).await;
+                                } else {
+                                    let _ = msg
+                                        .channel_id
+                                        .say(&ctx.http, "Error forming the ticket :/".to_string())
+                                        .await;
                                 }
                             }
                         }
                     }
-                    if msg.content.starts_with("!winner") && BET_HANDLER.lock().unwrap().is_trusted(&cleaned) {
+                    if msg.content.starts_with("!winner")
+                        && BET_HANDLER.lock().unwrap().is_trusted(&cleaned)
+                    {
                         let db_connection = self.db.clone();
                         let parts: Vec<&str> = msg.content.split_whitespace().collect();
                         let winner = parts[1].to_string();
                         let parsed_winner = parse_id(winner);
                         let ticket = parts[2].parse::<i32>().unwrap_or(-1);
                         if ticket == -1 {
-                            let _ = msg.channel_id.say(&ctx.http, "Invalid bet number please try again").await;
+                            let _ = msg
+                                .channel_id
+                                .say(&ctx.http, "Invalid bet number please try again")
+                                .await;
                         } else if parsed_winner == "Bad request" {
-                                let _ = msg.channel_id.say(&ctx.http, "Invalid user entered, please try again".to_string()).await;
+                            let _ = msg
+                                .channel_id
+                                .say(
+                                    &ctx.http,
+                                    "Invalid user entered, please try again".to_string(),
+                                )
+                                .await;
                         } else {
-                            let (winner_res, loser_res, amount_res) = BET_HANDLER.lock().unwrap().handle_bet_resolution(db_connection, ticket, parsed_winner.to_string());
+                            let (winner_res, loser_res, amount_res) =
+                                BET_HANDLER.lock().unwrap().handle_bet_resolution(
+                                    db_connection,
+                                    ticket,
+                                    parsed_winner.to_string(),
+                                );
                             if winner_res != "Fake" {
-                                let message = format!("<@{}> has won the bet losing {} hours from their debt while <@{}> has lost and nobly taking on {} hours of tekken", winner_res, amount_res, loser_res, amount_res);
-                                let tree_id = ChannelId::new(1433474989365002342);
+                                let message = format!(
+                                    "<@{}> has won the bet losing {} hours from their debt while <@{}> has lost and nobly taking on {} hours of tekken",
+                                    winner_res, amount_res, loser_res, amount_res
+                                );
+                                let tree_id = ChannelId::new(TREE_CHANNEL_ID);
                                 let _ = tree_id.say(&ctx.http, message.clone()).await;
-                                let kazoo_id = ChannelId::new(1319106712313135116);
+                                let kazoo_id = ChannelId::new(KAZOO_CHANNEL_ID);
                                 let _ = kazoo_id.say(&ctx.http, message).await;
-                            }
-                            else {
+                            } else {
                                 let _ = msg.channel_id.say(&ctx.http, "Error :(").await;
                             }
                         }
                     }
-                    if msg.content.starts_with("!cancel-bet") && BET_HANDLER.lock().unwrap().is_trusted(&cleaned) {
+                    if msg.content.starts_with("!cancel-bet")
+                        && BET_HANDLER.lock().unwrap().is_trusted(&cleaned)
+                    {
                         let parts: Vec<&str> = msg.content.split_whitespace().collect();
                         let ticket = parts[1].parse::<i32>().unwrap_or(-1);
                         if ticket == -1 {
-                            let _ = msg.channel_id.say(&ctx.http, "Invalid bet number please try again").await;
+                            let _ = msg
+                                .channel_id
+                                .say(&ctx.http, "Invalid bet number please try again")
+                                .await;
                         } else {
                             let amount = BET_HANDLER.lock().unwrap().cancel_bet(ticket);
                             if amount > 0.0 {
-                                let message = format!("Bet number {} has been removed and both debtors have recieved a bet refund of {} hours", ticket, amount);
+                                let message = format!(
+                                    "Bet number {} has been removed and both debtors have recieved a bet refund of {} hours",
+                                    ticket, amount
+                                );
                                 let _ = msg.channel_id.say(&ctx.http, message).await;
-                            }
-                            else {
+                            } else {
                                 let _ = msg.channel_id.say(&ctx.http, "Error :(").await;
                             }
                         }
@@ -229,25 +464,40 @@ impl EventHandler for Handler {
                     // The following functions are only intended for admin use and so will not be added to the help message
                     // For now admins can either add or remove members from the trusted list and I imagine changing bet hours
                     // may be necessary but would undermine trust in the bot. So at launch it will not
-                    let brandon_id:&str = &format!("{}", env::var("BRANDON_ID").unwrap());
-                    let kwangwon_id:&str = &format!("{}", env::var("KWANGWON_ID").unwrap());
-                    if msg.content.starts_with("!add-trusted") && (cleaned == brandon_id || cleaned == kwangwon_id) {
+                    let brandon_id: &str = &format!("{}", env::var("BRANDON_ID").unwrap());
+                    let kwangwon_id: &str = &format!("{}", env::var("KWANGWON_ID").unwrap());
+                    if msg.content.starts_with("!add-trusted")
+                        && (cleaned == brandon_id || cleaned == kwangwon_id)
+                    {
                         let parts: Vec<&str> = msg.content.split_whitespace().collect();
                         let winner = parts[1].to_string();
                         let new_trusted = parse_id(winner);
                         let http = ctx.http.clone();
-                        let _ = BET_HANDLER.lock().unwrap().add_trusted(new_trusted.to_string());
-                        let _ = msg.channel_id.say(&http, "Added new member to trusted list").await;
+                        let _ = BET_HANDLER
+                            .lock()
+                            .unwrap()
+                            .add_trusted(new_trusted.to_string());
+                        let _ = msg
+                            .channel_id
+                            .say(&http, "Added new member to trusted list")
+                            .await;
                     }
-                    if msg.content.starts_with("!remove-trusted") && (cleaned == brandon_id || cleaned == kwangwon_id) {
+                    if msg.content.starts_with("!remove-trusted")
+                        && (cleaned == brandon_id || cleaned == kwangwon_id)
+                    {
                         let parts: Vec<&str> = msg.content.split_whitespace().collect();
                         let wizard = parts[1].to_string();
                         let new_wizard = parse_id(wizard);
                         let http = ctx.http.clone();
                         let _ = BET_HANDLER.lock().unwrap().remove_trusted(&new_wizard);
-                        let _ = msg.channel_id.say(&http, "Removed member from the trusted list").await;
+                        let _ = msg
+                            .channel_id
+                            .say(&http, "Removed member from the trusted list")
+                            .await;
                     }
-                    if msg.content.starts_with("!add-user") && (cleaned == brandon_id || cleaned == kwangwon_id) {
+                    if msg.content.starts_with("!add-user")
+                        && (cleaned == brandon_id || cleaned == kwangwon_id)
+                    {
                         let parts: Vec<&str> = msg.content.split_whitespace().collect();
                         let wizard = parts[1].to_string();
                         let new_wizard = parse_id(wizard);
@@ -261,10 +511,22 @@ impl EventHandler for Handler {
                         // however, I also don't have time currently to properly fix this prime target for
                         // (Issue #11)
                         BET_HANDLER.lock().unwrap().add_better(new_wizard.clone());
-                        BET_HANDLER.lock().unwrap().add_relation(new_wizard.clone(), name.clone());
-                        BET_HANDLER.lock().unwrap().update_bet_hours(new_wizard.clone(), 10.0);
-                        BET_HANDLER.lock().unwrap().update_hour_change(new_wizard.clone(), 0.0);
-                        let newbie = User::new(new_wizard, name, playtime, hours_owed, steam_id, 0.0, 10.0, polaris_id, 0);
+                        BET_HANDLER
+                            .lock()
+                            .unwrap()
+                            .add_relation(new_wizard.clone(), name.clone());
+                        BET_HANDLER
+                            .lock()
+                            .unwrap()
+                            .update_bet_hours(new_wizard.clone(), 10.0);
+                        BET_HANDLER
+                            .lock()
+                            .unwrap()
+                            .update_hour_change(new_wizard.clone(), 0.0);
+                        let newbie = User::new(
+                            new_wizard, name, playtime, hours_owed, steam_id, 0.0, 10.0,
+                            polaris_id, 0,
+                        );
                         // now update the db
                         {
                             let db = self.db.clone();
@@ -275,7 +537,9 @@ impl EventHandler for Handler {
                         let http = ctx.http.clone();
                         let _ = msg.channel_id.say(&http, "Added user to the bot").await;
                     }
-                    if msg.content.starts_with("!adjust-hours") && (cleaned == brandon_id || cleaned == kwangwon_id) {
+                    if msg.content.starts_with("!adjust-hours")
+                        && (cleaned == brandon_id || cleaned == kwangwon_id)
+                    {
                         let parts: Vec<&str> = msg.content.split_whitespace().collect();
                         let wizard = parts[1].to_string();
                         let new_wizard = parse_id(wizard);
@@ -288,13 +552,20 @@ impl EventHandler for Handler {
                             // message after the db operation is successful
                             {
                                 let db = self.db.clone();
-                                let db_connection = db.lock().unwrap(); 
-                                let _ = db::update_hours_owed(&db_connection, &new_wizard, new_hours).unwrap();
+                                let db_connection = db.lock().unwrap();
+                                let _ =
+                                    db::update_hours_owed(&db_connection, &new_wizard, new_hours)
+                                        .unwrap();
                             }
-                            let _ = msg.channel_id.say(&http, "successfully updated hours").await;
+                            let _ = msg
+                                .channel_id
+                                .say(&http, "successfully updated hours")
+                                .await;
                         }
                     }
-                    if msg.content.starts_with("!update-user") && (cleaned == brandon_id || cleaned == kwangwon_id) {
+                    if msg.content.starts_with("!update-user")
+                        && (cleaned == brandon_id || cleaned == kwangwon_id)
+                    {
                         let parts: Vec<&str> = msg.content.split_whitespace().collect();
                         let wizard = parts[1].to_string();
                         let new_wizard = parse_id(wizard);
@@ -303,19 +574,25 @@ impl EventHandler for Handler {
                         {
                             let db = self.db.clone();
                             let db_connection = db.lock().unwrap();
-                            let _ = db::update_user_column(&db_connection, &polaris_id, &new_wizard).unwrap();
+                            let _ =
+                                db::update_user_column(&db_connection, &polaris_id, &new_wizard)
+                                    .unwrap();
                         }
                         // send a success message
                         let http = ctx.http.clone();
                         let _ = msg.channel_id.say(&http, "updated user's polaris id").await;
                     }
-                    if msg.content.starts_with("!user-battles") && (cleaned == brandon_id || cleaned == kwangwon_id) {
+                    if msg.content.starts_with("!user-battles")
+                        && (cleaned == brandon_id || cleaned == kwangwon_id)
+                    {
                         dotenv::dotenv().ok();
-                        let ewgf_key = env::var("EWGF_KEY").expect("Expected a token in the environment");
+                        let ewgf_key =
+                            env::var("EWGF_KEY").expect("Expected a token in the environment");
                         let parts: Vec<&str> = msg.content.split_whitespace().collect();
                         let polaris_id = parts[1].to_string();
                         let name = parts[2].to_string();
-                        let stat_message = daily_task::match_analysis(&polaris_id, &ewgf_key, 1.0, &name).await;
+                        let stat_message =
+                            daily_task::match_analysis(&polaris_id, &ewgf_key, 1.0, &name).await;
                         // send a success message
                         let http = ctx.http.clone();
                         let _ = msg.channel_id.say(&http, stat_message.clone()).await;
