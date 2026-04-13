@@ -9,6 +9,7 @@ pub struct User {
     hours_owed: f32,
     steam_id: String,
     monthly_hours: f32,
+    weekly_hours: f32,
     bet_hours_available: f32,
     polaris_id: String,
     played_yesterday: i32,
@@ -67,6 +68,7 @@ impl User {
         hours_owed: f32,
         steam_id: String,
         monthly_hours: f32,
+        weekly_hours: f32,
         bet_hours_available: f32,
         polaris_id: String,
         played_yesterday: i32,
@@ -78,6 +80,7 @@ impl User {
             hours_owed,
             steam_id,
             monthly_hours,
+            weekly_hours,
             bet_hours_available,
             polaris_id,
             played_yesterday,
@@ -104,6 +107,9 @@ impl User {
     pub fn get_monthly_hours(&self) -> f32 {
         self.monthly_hours
     }
+    pub fn get_weekly_hours(&self) -> f32 {
+        self.weekly_hours
+    }
     pub fn get_playtime(&self) -> f32 {
         self.playtime
     }
@@ -112,6 +118,9 @@ impl User {
     }
     pub fn set_monthly_hours(&mut self, new_val: f32) {
         self.monthly_hours = new_val;
+    }
+    pub fn set_weekly_hours(&mut self, new_val: f32) {
+        self.weekly_hours = new_val;
     }
     pub fn set_bet_hours_available(&mut self, new_val: f32) {
         self.bet_hours_available = new_val;
@@ -202,6 +211,12 @@ pub fn init_db() -> Result<Connection> {
                 [],
             )?;
         }
+        if !columns.contains(&"weekly_hours".to_string()) {
+            conn.execute(
+                "ALTER TABLE users ADD COLUMN weekly_hours FLOAT NOT NULL DEFAULT 0.0",
+                [],
+            )?;
+        }
         // Every time the db get intitalized it means that we are updating the bot
         // the update may not happen in a single day so its better to be able to control
         // the day counter whenever we choose to launch the bot
@@ -224,7 +239,7 @@ pub fn init_db() -> Result<Connection> {
         // Make sure to check that this is right before deployment lol
         conn.execute(
             "INSERT INTO time (month, week, year, zero_day_streak) VALUES (?1, ?2, ?3, ?4)",
-            (4, 2, 2026, 0),
+            (4, 6, 2026, 0),
         )?;
     }
     Ok(conn)
@@ -243,6 +258,7 @@ pub fn get_users(conn: &Connection) -> Result<Vec<User>, rusqlite::Error> {
             bet_hours_available: row.get(6)?,
             polaris_id: row.get(7)?,
             played_yesterday: row.get(8)?,
+            weekly_hours: row.get(9)?,
         })
     })?;
     let users: Result<Vec<User>> = user_collection.collect();
@@ -283,6 +299,7 @@ pub fn bet_result(conn: &Connection, amount: f32, id: &str) -> rusqlite::Result<
             bet_hours_available: row.get(6)?,
             polaris_id: row.get(7)?,
             played_yesterday: row.get(8)?,
+            weekly_hours: row.get(9)?,
         })
     })?;
     let mut bet_total = amount;
@@ -326,6 +343,7 @@ pub fn get_user(conn: &Connection, id: &str) -> Result<Option<User>> {
             bet_hours_available: row.get(6)?,
             polaris_id: row.get(7)?,
             played_yesterday: row.get(8)?,
+            weekly_hours: row.get(9)?,
         };
         Ok(Some(user))
     } else {
@@ -355,10 +373,10 @@ pub fn add_user(conn: &Connection, new_user: User) -> rusqlite::Result<()> {
     Ok(())
 }
 
-pub fn update_hours_owed(conn: &Connection, id: &str, hours: f32, monthly_hours: f32) -> rusqlite::Result<()> {
+pub fn update_hours_owed(conn: &Connection, id: &str, hours: f32, monthly_hours: f32, weekly_hours: f32) -> rusqlite::Result<()> {
     conn.execute(
-        "UPDATE users SET hours_owed = ?, monthly_hours = ? WHERE id = ?",
-        params![hours, monthly_hours, id],
+        "UPDATE users SET hours_owed = ?, monthly_hours = ?, weekly_hours = ? WHERE id = ?",
+        params![hours, monthly_hours, weekly_hours, id],
     )?;
     Ok(())
 }

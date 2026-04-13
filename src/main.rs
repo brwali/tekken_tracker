@@ -93,7 +93,20 @@ impl EventHandler for Handler {
             let setup_db = self.db.clone();
             setup_betting_manager(setup_db);
         }
-
+        let tree_channel = ChannelId::new(TREE_CHANNEL_ID);
+        let kazoo_channel = ChannelId::new(KAZOO_CHANNEL_ID);
+        let release_message = "Release Notes: After taking the feedback received from debtors into consideration for the channel kick,\
+                              the tekken bank agrees that using the monthly hours played is too punitive. We do not want to punish good\
+                              behavior, so we will be changing the check for amount of hours played that week. If you have played 1.25 hours\
+                              you will not be kicked from call for that week. Happy tekkening gamers :D";
+        let _ =
+            tree_channel
+            .say(&ctx.http, release_message)
+            .await;
+        let _ =
+            kazoo_channel
+            .say(&ctx.http, release_message)
+            .await;
         tokio::spawn({
             let http = ctx.http.clone();
             let db_connection = self.db.clone();
@@ -190,9 +203,9 @@ impl EventHandler for Handler {
         if !owes_hours {
             return;
         }
-        let monthly_hours = joined_user.get_monthly_hours();
+        let weekly_hours = joined_user.get_weekly_hours();
 
-        if monthly_hours >= 5.0 {
+        if weekly_hours >= 1.25 {
             return;
         }
         tokio::spawn({
@@ -524,7 +537,7 @@ impl EventHandler for Handler {
                             .unwrap()
                             .update_hour_change(new_wizard.clone(), 0.0);
                         let newbie = User::new(
-                            new_wizard, name, playtime, hours_owed, steam_id, 0.0, 10.0,
+                            new_wizard, name, playtime, hours_owed, steam_id, 0.0, 0.0, 10.0,
                             polaris_id, 0,
                         );
                         // now update the db
@@ -545,8 +558,9 @@ impl EventHandler for Handler {
                         let new_wizard = parse_id(wizard);
                         let new_hours = parts[2].parse::<f32>().unwrap_or(-1.0);
                         let new_monthly = parts[3].parse::<f32>().unwrap_or(-1.0);
+                        let new_weekly = parts[4].parse::<f32>().unwrap_or(-1.0);
                         let http = ctx.http.clone();
-                        if new_hours == -1.0 || new_monthly == -1.0 {
+                        if new_hours == -1.0 || new_monthly == -1.0 || new_weekly == -1.0 {
                             let _ = msg.channel_id.say(&http, "Invalid hour amount").await;
                         } else {
                             // Another instance of the db needing its own scope because we want to send a
@@ -554,7 +568,7 @@ impl EventHandler for Handler {
                             {
                                 let db = self.db.clone();
                                 let db_connection = db.lock().unwrap();
-                                match db::update_hours_owed(&db_connection, &new_wizard, new_hours, new_monthly) {
+                                match db::update_hours_owed(&db_connection, &new_wizard, new_hours, new_monthly, new_weekly) {
                                     Ok(_) => println!("Update successful"),
                                     Err(e) => println!("Update failed: {:?}", e),
                                 }
