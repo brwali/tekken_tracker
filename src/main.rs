@@ -2,7 +2,6 @@ mod bet;
 mod daily_task;
 mod db;
 use crate::db::User;
-use chrono::Utc;
 use once_cell::sync::Lazy;
 use rand::Rng;
 use rusqlite::Connection;
@@ -95,10 +94,9 @@ impl EventHandler for Handler {
         }
         let tree_channel = ChannelId::new(TREE_CHANNEL_ID);
         let kazoo_channel = ChannelId::new(KAZOO_CHANNEL_ID);
-        let release_message = "Release Notes: After taking the feedback received from debtors into consideration for the channel kick,\
-                              the tekken bank agrees that using the monthly hours played is too punitive. We do not want to punish good\
-                              behavior, so we will be changing the check for amount of hours played that week. If you have played 1.25 hours\
-                              you will not be kicked from call for that week. Happy tekkening gamers :D";
+        let release_message = "Hot fix: turns out the timeout only works in kazoo which is kinda funny but for the \
+                                     sake of consistency as well as not being too much of a terrorist, I will be removing \
+                                     it, so now the bot will only kick debtors.";
         let _ =
             tree_channel
             .say(&ctx.http, release_message)
@@ -268,18 +266,8 @@ impl EventHandler for Handler {
                         }
                     } else {
                         // Chance passed - timeout user for 5 minute
-                        if let Some(mut member) = member {
+                        if let Some(member) = member {
                             let _ = member.disconnect_from_voice(&http).await;
-                            let timeout_duration = std::time::Duration::from_secs(5 * 60);
-                            let timestamp = Timestamp::from_unix_timestamp(
-                                (Utc::now()
-                                    + chrono::Duration::from_std(timeout_duration).unwrap())
-                                .timestamp(),
-                            )
-                            .unwrap();
-                            let _ = member
-                                .disable_communication_until_datetime(&http, timestamp)
-                                .await;
                             let notice = format!(
                                 "<@{}> owes hours and failed the coinflip so they got disconnected from voice.",
                                 user_id_clone
