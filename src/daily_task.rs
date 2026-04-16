@@ -30,7 +30,8 @@ pub async fn match_analysis(
     daily_playtime: f32,
     name: &str,
 ) -> String {
-    let request = format!("https://api.ewgf.gg/external/battles/{}", polaris_id,);
+    let base_url = env::var("EWGF_BASE_URL").unwrap_or_else(|_| "https://api.ewgf.gg".to_string());
+    let request = format!("{}/external/battles/{}", base_url, polaris_id);
     let json_response = get_request(&request, Some(token)).await;
     let now = Utc::now();
     let cutoff = now - Duration::hours(48);
@@ -363,5 +364,43 @@ mod tests {
     fn test_round_after_math_negative() {
         assert_eq!(round_after_math(-1.239), -1.23);
         assert_eq!(round_after_math(-0.001), 0.0);
+    }
+}
+
+#[cfg(test)]
+mod mock_tests {
+    use super::*;
+    use mockito::Server;
+    use serde_json::json;
+
+    #[tokio::test]
+    async fn test_match_analysis_wins() {
+        let mut server = Server::new_async().await;
+        
+        let payload = json!({
+            "data": [
+                {
+                    "battle_at": Utc::now().to_rfc3339(),
+                    "winner": 1,
+                    "p1_tekken_id": "polaris123",
+                    "p2_tekken_id": "loser456",
+                    "p1_rounds_won": 3,
+                    "p2_rounds_won": 0,
+                }
+            ]
+        });
+
+        let mock_endpoint = server.mock("GET", "/external/battles/polaris-123")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(payload.to_string())
+            .create_async().await;
+
+        env::set_var("EWGF_BASE_URL", server.url());
+
+        let result = match_analysis("polaris-123", "dummy_token", 5.0, "Jackson").await;
+        
+        assert!(result.contains("1 matches were played!! 1 wins, 0 losses, 0 draws"));
+        mock_endpoint.assert_async().await;
     }
 }
