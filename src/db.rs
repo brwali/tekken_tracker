@@ -384,6 +384,7 @@ pub fn update_hours_owed(conn: &Connection, id: &str, hours: f32, monthly_hours:
 #[cfg(test)]
 mod tests {
     use super::*;
+    use approx::assert_relative_eq;
 
     #[test]
     fn test_user_getters_setters() {
@@ -401,12 +402,12 @@ mod tests {
         );
         assert_eq!(u.get_id(), "id1");
         assert_eq!(u.get_name(), "Alice");
-        assert!((u.get_playtime() - 1.23).abs() < f32::EPSILON);
-        assert!((u.get_hours_owed() - 10.0).abs() < f32::EPSILON);
+        assert_relative_eq!(u.get_playtime(), 1.23);
+        assert_relative_eq!(u.get_hours_owed(), 10.0);
         u.set_playtime(2.5);
-        assert!((u.get_playtime() - 2.5).abs() < f32::EPSILON);
+        assert_relative_eq!(u.get_playtime(), 2.5);
         u.set_hours_owed(7.75);
-        assert!((u.get_hours_owed() - 7.75).abs() < f32::EPSILON);
+        assert_relative_eq!(u.get_hours_owed(), 7.75);
     }
 
     #[test]
@@ -430,6 +431,7 @@ mod tests {
 #[cfg(test)]
 mod db_mock_tests {
     use super::*;
+    use approx::assert_relative_eq;
     use rusqlite::Connection;
 
     fn get_in_memory_db() -> Connection {
@@ -477,7 +479,7 @@ mod db_mock_tests {
         update_user(&conn, u_updated).unwrap();
         
         let fetched_updated = get_user(&conn, "test_id").unwrap().unwrap();
-        assert!((fetched_updated.get_playtime() - 20.5).abs() < f32::EPSILON);
+        assert_relative_eq!(fetched_updated.get_playtime(), 20.5);
     }
 
     #[test]
@@ -499,9 +501,9 @@ mod db_mock_tests {
 
         update_hours_owed(&conn, "test_id", 33.3, 11.1, 22.2).unwrap();
         let fetched = get_user(&conn, "test_id").unwrap().unwrap();
-        assert!((fetched.get_hours_owed() - 33.3).abs() < f32::EPSILON);
-        assert!((fetched.get_monthly_hours() - 11.1).abs() < f32::EPSILON);
-        assert!((fetched.get_weekly_hours() - 22.2).abs() < f32::EPSILON);
+        assert_relative_eq!(fetched.get_hours_owed(), 33.3);
+        assert_relative_eq!(fetched.get_monthly_hours(), 11.1);
+        assert_relative_eq!(fetched.get_weekly_hours(), 22.2);
     }
 
     #[test]
@@ -524,6 +526,6 @@ mod db_mock_tests {
         bet_result(&conn, 5.0, "test_id").unwrap();
         
         let fetched = get_user(&conn, "test_id").unwrap().unwrap();
-        assert!((fetched.get_hours_owed() - 15.0).abs() < f32::EPSILON);
+        assert_relative_eq!(fetched.get_hours_owed(), 15.0);
     }
 }

@@ -17,3 +17,4 @@ chrono = "0.4"
 
 [dev-dependencies]
 mockito = "1.4.0"
+approx = "0.5"
