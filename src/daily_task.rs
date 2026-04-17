@@ -234,7 +234,8 @@ async fn update_debt_hours(
                             &ewgf_key,
                             daily_playtime,
                             &birth_name,
-                            None,`r`n                        )
+                            Some("https://api.ewgf.gg".to_string()),
+                        )
                         .await;
                         message.push_str(&matches);
                         message.push_str("\n");

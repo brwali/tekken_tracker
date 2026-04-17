@@ -455,7 +455,7 @@ mod db_mock_tests {
     }
 
     #[test]
-    fn test_add_and_update_user() {
+    fn test_add_user() {
         let conn = get_in_memory_db();
         let u = User::new(
             "test_id".to_string(),
@@ -473,13 +473,53 @@ mod db_mock_tests {
         
         let fetched = get_user(&conn, "test_id").unwrap().unwrap();
         assert_eq!(fetched.get_name(), "test_name");
+    }
+
+    #[test]
+    fn test_update_user() {
+        let conn = get_in_memory_db();
+        let u = User::new(
+            "test_id".to_string(),
+            "test_name".to_string(),
+            5.0,
+            10.0,
+            "steam_1".to_string(),
+            0.0,
+            0.0,
+            0.0,
+            "polar_1".to_string(),
+            0,
+        );
+        add_user(&conn, u).unwrap();
         
-        let mut u_updated = fetched.clone();
+        let mut u_updated = get_user(&conn, "test_id").unwrap().unwrap();
         u_updated.set_playtime(20.5);
         update_user(&conn, u_updated).unwrap();
         
         let fetched_updated = get_user(&conn, "test_id").unwrap().unwrap();
         assert_relative_eq!(fetched_updated.get_playtime(), 20.5);
+    }
+
+    #[test]
+    fn test_update_user_column() {
+        let conn = get_in_memory_db();
+        let u = User::new(
+            "test_id".to_string(),
+            "test_name".to_string(),
+            5.0,
+            10.0,
+            "steam_1".to_string(),
+            0.0,
+            0.0,
+            0.0,
+            "polar_1".to_string(),
+            0,
+        );
+        add_user(&conn, u).unwrap();
+        
+        update_user_column(&conn, "polar_2", "test_id").unwrap();
+        let fetched_updated = get_user(&conn, "test_id").unwrap().unwrap();
+        assert_eq!(fetched_updated.get_polar_id(), "polar_2");
     }
 
     #[test]
