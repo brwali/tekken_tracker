@@ -380,3 +380,192 @@ pub fn update_hours_owed(conn: &Connection, id: &str, hours: f32, monthly_hours:
     )?;
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use approx::assert_relative_eq;
+
+    #[test]
+    fn test_user_getters_setters() {
+        let mut u = User::new(
+            "id1".to_string(),
+            "Alice".to_string(),
+            1.23,
+            10.0,
+            "steam123".to_string(),
+            0.0,
+            5.0,
+            0.0,
+            "polar1".to_string(),
+            0,
+        );
+        assert_eq!(u.get_id(), "id1");
+        assert_eq!(u.get_name(), "Alice");
+        assert_relative_eq!(u.get_playtime(), 1.23);
+        assert_relative_eq!(u.get_hours_owed(), 10.0);
+        u.set_playtime(2.5);
+        assert_relative_eq!(u.get_playtime(), 2.5);
+        u.set_hours_owed(7.75);
+        assert_relative_eq!(u.get_hours_owed(), 7.75);
+    }
+
+    #[test]
+    fn test_time_getters_setters() {
+        let mut t = Time::new();
+        t.set_month(12);
+        t.set_week(3);
+        t.set_year(2025);
+        assert_eq!(t.get_month(), 12);
+        assert_eq!(t.get_week(), 3);
+        assert_eq!(t.get_year(), 2025);
+        t.set_month(1);
+        t.set_week(7);
+        t.set_year(2026);
+        assert_eq!(t.get_month(), 1);
+        assert_eq!(t.get_week(), 7);
+        assert_eq!(t.get_year(), 2026);
+    }
+}
+
+#[cfg(test)]
+mod db_mock_tests {
+    use super::*;
+    use approx::assert_relative_eq;
+    use rusqlite::Connection;
+
+    fn get_in_memory_db() -> Connection {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS users (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                playtime FLOAT NOT NULL,
+                hours_owed FLOAT NOT NULL,
+                steam_id TEXT NOT NULL,
+                monthly_hours FLOAT NOT NULL,
+                bet_hours_available FLOAT NOT NULL,
+                polaris_id TEXT NOT NULL,
+                played_yesterday INT NOT NULL DEFAULT 0,
+                weekly_hours FLOAT NOT NULL DEFAULT 0.0
+            )",
+            [],
+        ).unwrap();
+        conn
+    }
+
+    #[test]
+    fn test_add_user() {
+        let conn = get_in_memory_db();
+        let u = User::new(
+            "test_id".to_string(),
+            "test_name".to_string(),
+            5.0,
+            10.0,
+            "steam_1".to_string(),
+            0.0,
+            0.0,
+            0.0,
+            "polar_1".to_string(),
+            0,
+        );
+        add_user(&conn, u).unwrap();
+        
+        let fetched = get_user(&conn, "test_id").unwrap().unwrap();
+        assert_eq!(fetched.get_name(), "test_name");
+    }
+
+    #[test]
+    fn test_update_user() {
+        let conn = get_in_memory_db();
+        let u = User::new(
+            "test_id".to_string(),
+            "test_name".to_string(),
+            5.0,
+            10.0,
+            "steam_1".to_string(),
+            0.0,
+            0.0,
+            0.0,
+            "polar_1".to_string(),
+            0,
+        );
+        add_user(&conn, u).unwrap();
+        
+        let mut u_updated = get_user(&conn, "test_id").unwrap().unwrap();
+        u_updated.set_playtime(20.5);
+        update_user(&conn, u_updated).unwrap();
+        
+        let fetched_updated = get_user(&conn, "test_id").unwrap().unwrap();
+        assert_relative_eq!(fetched_updated.get_playtime(), 20.5);
+    }
+
+    #[test]
+    fn test_update_user_column() {
+        let conn = get_in_memory_db();
+        let u = User::new(
+            "test_id".to_string(),
+            "test_name".to_string(),
+            5.0,
+            10.0,
+            "steam_1".to_string(),
+            0.0,
+            0.0,
+            0.0,
+            "polar_1".to_string(),
+            0,
+        );
+        add_user(&conn, u).unwrap();
+        
+        update_user_column(&conn, "polar_2", "test_id").unwrap();
+        let fetched_updated = get_user(&conn, "test_id").unwrap().unwrap();
+        assert_eq!(fetched_updated.get_polar_id(), "polar_2");
+    }
+
+    #[test]
+    fn test_update_hours_owed() {
+        let conn = get_in_memory_db();
+        let u = User::new(
+            "test_id".to_string(),
+            "test_name".to_string(),
+            5.0,
+            10.0,
+            "steam_1".to_string(),
+            0.0,
+            0.0,
+            0.0,
+            "polar_1".to_string(),
+            0,
+        );
+        add_user(&conn, u).unwrap();
+
+        update_hours_owed(&conn, "test_id", 33.3, 11.1, 22.2).unwrap();
+        let fetched = get_user(&conn, "test_id").unwrap().unwrap();
+        assert_relative_eq!(fetched.get_hours_owed(), 33.3);
+        assert_relative_eq!(fetched.get_monthly_hours(), 11.1);
+        assert_relative_eq!(fetched.get_weekly_hours(), 22.2);
+    }
+
+    #[test]
+    fn test_bet_result() {
+        let conn = get_in_memory_db();
+        let u = User::new(
+            "test_id".to_string(),
+            "test_name".to_string(),
+            5.0,
+            10.0,
+            "steam_1".to_string(),
+            0.0,
+            0.0,
+            0.0,
+            "polar_1".to_string(),
+            0,
+        );
+        
+        add_user(&conn, u).unwrap();
+        bet_result(&conn, 5.0, "test_id").unwrap();
+        
+        let fetched = get_user(&conn, "test_id").unwrap().unwrap();
+        assert_relative_eq!(fetched.get_hours_owed(), 15.0);
+    }
+}
