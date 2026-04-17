@@ -29,8 +29,9 @@ pub async fn match_analysis(
     token: &str,
     daily_playtime: f32,
     name: &str,
+    override_url: Option<String>,
 ) -> String {
-    let base_url = env::var("EWGF_BASE_URL").unwrap_or_else(|_| "https://api.ewgf.gg".to_string());
+    let base_url = override_url.unwrap_or_else(|| "https://api.ewgf.gg".to_string());
     let request = format!("{}/external/battles/{}", base_url, polaris_id);
     let json_response = get_request(&request, Some(token)).await;
     let now = Utc::now();
@@ -233,7 +234,7 @@ async fn update_debt_hours(
                             &ewgf_key,
                             daily_playtime,
                             &birth_name,
-                        )
+                            None,`r`n                        )
                         .await;
                         message.push_str(&matches);
                         message.push_str("\n");
@@ -396,9 +397,7 @@ mod mock_tests {
             .with_body(payload.to_string())
             .create_async().await;
 
-        env::set_var("EWGF_BASE_URL", server.url());
-
-        let result = match_analysis("polaris-123", "dummy_token", 5.0, "Jackson").await;
+        let result = match_analysis("polaris-123", "dummy_token", 5.0, "Jackson", Some(server.url())).await;
         
         assert!(result.contains("1 matches were played!! 1 wins, 0 losses, 0 draws"));
         mock_endpoint.assert_async().await;

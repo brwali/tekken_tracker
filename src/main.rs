@@ -597,7 +597,7 @@ impl EventHandler for Handler {
                         let polaris_id = parts[1].to_string();
                         let name = parts[2].to_string();
                         let stat_message =
-                            daily_task::match_analysis(&polaris_id, &ewgf_key, 1.0, &name).await;
+                            daily_task::match_analysis(&polaris_id, &ewgf_key, 1.0, &name, None).await;
                         // send a success message
                         let http = ctx.http.clone();
                         let _ = msg.channel_id.say(&http, stat_message.clone()).await;
