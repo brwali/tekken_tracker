@@ -94,9 +94,8 @@ impl EventHandler for Handler {
         }
         let tree_channel = ChannelId::new(TREE_CHANNEL_ID);
         let kazoo_channel = ChannelId::new(KAZOO_CHANNEL_ID);
-        let release_message = "Hot fix: turns out the timeout only works in kazoo which is kinda funny but for the \
-                                     sake of consistency as well as not being too much of a terrorist, I will be removing \
-                                     it, so now the bot will only kick debtors.";
+        let release_message = "Hot fix: After a discussion with Kwangwon, winning a bet should count towards the weekly playtime. Losing a bet will not deduct from this value. \
+                                A reminder that weekly playtime is the metric used to calculate whether a debtor is vulnerable to being kicked from call.";
         let _ =
             tree_channel
             .say(&ctx.http, release_message)
@@ -445,8 +444,8 @@ impl EventHandler for Handler {
                                 user = db::get_user(&db_connection, &parsed_user).unwrap().unwrap();
                             }
                             let _ = msg.channel_id.say(&http, format!(
-                                    "{} has played {:?} hours\n\nOwes a total of {:?} hours\n\nHas played {:?} hours this month\n\nAnd has {:?} hours to bet with this week",
-                                    user.get_name(), user.get_playtime(), user.get_hours_owed(), user.get_monthly_hours(), BET_HANDLER.lock().unwrap().get_bet_hours(user.get_id())
+                                    "{} has played {:?} hours\n\nOwes a total of {:?} hours\n\nHas played {:?} hours this month\n\nHas played {:?} this week\n\nAnd has {:?} hours to bet with this week",
+                                    user.get_name(), user.get_playtime(), user.get_hours_owed(), user.get_monthly_hours(), user.get_weekly_hours(), BET_HANDLER.lock().unwrap().get_bet_hours(user.get_id())
                                 )).await;
                         }
                     }

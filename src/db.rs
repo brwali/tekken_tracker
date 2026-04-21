@@ -239,7 +239,7 @@ pub fn init_db() -> Result<Connection> {
         // Make sure to check that this is right before deployment lol
         conn.execute(
             "INSERT INTO time (month, week, year, zero_day_streak) VALUES (?1, ?2, ?3, ?4)",
-            (4, 6, 2026, 0),
+            (4, 1, 2026, 0),
         )?;
     }
     Ok(conn)
@@ -303,12 +303,21 @@ pub fn bet_result(conn: &Connection, amount: f32, id: &str) -> rusqlite::Result<
         })
     })?;
     let mut bet_total = amount;
+    let mut weekly_change = 0.0;
     for user in user_collection {
-        bet_total += user.unwrap().get_hours_owed();
+        let clone_user = user?.clone();
+        bet_total += clone_user.get_hours_owed();
+        // negative amount means this is the winner so adjust the weekly_hours
+        if amount < 0.0 {
+            weekly_change = (amount * -1.0) + clone_user.get_weekly_hours();
+        } else {
+            weekly_change = clone_user.get_weekly_hours();
+        }
     }
+    
     conn.execute(
-        "UPDATE users SET hours_owed = ? WHERE id = ?",
-        params![bet_total, id],
+        "UPDATE users SET hours_owed = ?, weekly_hours = ? WHERE id = ?",
+        params![bet_total, weekly_change, id],
     )?;
     Ok(())
 }
@@ -563,9 +572,10 @@ mod db_mock_tests {
         );
         
         add_user(&conn, u).unwrap();
-        bet_result(&conn, 5.0, "test_id").unwrap();
+        bet_result(&conn, -5.0, "test_id").unwrap();
         
         let fetched = get_user(&conn, "test_id").unwrap().unwrap();
-        assert_relative_eq!(fetched.get_hours_owed(), 15.0);
+        assert_relative_eq!(fetched.get_hours_owed(), 5.0);
+        assert_relative_eq!(fetched.get_weekly_hours(), 5.0);
     }
 }
