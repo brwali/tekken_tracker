@@ -217,8 +217,8 @@ async fn update_debt_hours(
                         total_hours_today += daily_playtime;
                         user.set_playtime(playtime_outer);
                         let monthly_hours = user.get_monthly_hours();
-                        let weekly_hours = user.get_weekly_hours();
                         user.set_monthly_hours(round_after_math(monthly_hours + daily_playtime));
+                        let weekly_hours = user.get_weekly_hours();
                         user.set_weekly_hours(round_after_math(weekly_hours + daily_playtime));
                         if new_week {
                             message.push_str(&format!("<@{}> has played {} hours and has {} hours left to go!\nThey have played {} tekken hours since last time, way to go :D!!!\n", name, playtime_outer, hours_left, daily_playtime));

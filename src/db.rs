@@ -267,8 +267,8 @@ pub fn get_users(conn: &Connection) -> Result<Vec<User>, rusqlite::Error> {
 
 pub fn update_user(conn: &Connection, user: User) -> rusqlite::Result<()> {
     conn.execute(
-        "UPDATE users SET playtime = ?, hours_owed = ?, monthly_hours = ?, bet_hours_available = ?, played_yesterday = ? WHERE id = ?",
-        params![user.playtime, user.hours_owed, user.monthly_hours, user.bet_hours_available, user.played_yesterday, user.id],
+        "UPDATE users SET playtime = ?, hours_owed = ?, monthly_hours = ?, weekly_hours = ?, bet_hours_available = ?, played_yesterday = ? WHERE id = ?",
+        params![user.playtime, user.hours_owed, user.monthly_hours, user.weekly_hours, user.bet_hours_available, user.played_yesterday, user.id],
     )?;
     Ok(())
 }

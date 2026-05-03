@@ -94,8 +94,8 @@ impl EventHandler for Handler {
         }
         let tree_channel = ChannelId::new(TREE_CHANNEL_ID);
         let kazoo_channel = ChannelId::new(KAZOO_CHANNEL_ID);
-        let release_message = "Hot fix: After a discussion with Kwangwon, winning a bet should count towards the weekly playtime. Losing a bet will not deduct from this value. \
-                                A reminder that weekly playtime is the metric used to calculate whether a debtor is vulnerable to being kicked from call.";
+        let release_message = "Hot fix: There may or may not have been a scenario where the weekly hours played wouldn't update automatically ;). \
+                                That is now fixed :D (for those angry at the tekken bot, this was manually fixed for every instance the bot failed)";
         let _ =
             tree_channel
             .say(&ctx.http, release_message)
