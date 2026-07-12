@@ -13,6 +13,7 @@ pub struct User {
     bet_hours_available: f32,
     polaris_id: String,
     played_yesterday: i32,
+    individual_counter: i32,
 }
 
 #[derive(Clone)]
@@ -69,6 +70,7 @@ impl User {
         steam_id: String,
         monthly_hours: f32,
         weekly_hours: f32,
+        individual_counter: i32,
         bet_hours_available: f32,
         polaris_id: String,
         played_yesterday: i32,
@@ -81,6 +83,7 @@ impl User {
             steam_id,
             monthly_hours,
             weekly_hours,
+            individual_counter,
             bet_hours_available,
             polaris_id,
             played_yesterday,
@@ -113,6 +116,9 @@ impl User {
     pub fn get_playtime(&self) -> f32 {
         self.playtime
     }
+    pub fn get_individual_counter(&self) -> i32 {
+        self.individual_counter
+    }
     pub fn set_hours_owed(&mut self, new_val: f32) {
         self.hours_owed = new_val;
     }
@@ -131,6 +137,9 @@ impl User {
     pub fn set_played_yesterday(&mut self, new_val: i32) {
         self.played_yesterday = new_val;
     }
+    pub fn set_individual_counter(&mut self, new_val: i32) {
+        self.individual_counter = new_val;
+    }
 }
 
 pub fn init_db() -> Result<Connection> {
@@ -141,53 +150,56 @@ pub fn init_db() -> Result<Connection> {
         let table_exists = stmt.exists([])?;
         if !table_exists {
             conn.execute(
-                "CREATE TABLE IF NOT EXISTS users (
-                    id TEXT PRIMARY KEY,
-                    name TEXT NOT NULL,
-                    playtime FLOAT NOT NULL,
-                    hours_owed FLOAT NOT NULL,
-                    steam_id TEXT NOT NULL,
-                    monthly_hours FLOAT NOT NULL,
-                    bet_hours_available FLOAT NOT NULL,
-                    polaris_id TEXT NOT NULL
-                )",
-                [],
+    "CREATE TABLE IF NOT EXISTS users (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        playtime FLOAT NOT NULL,
+        hours_owed FLOAT NOT NULL,
+        steam_id TEXT NOT NULL,
+        monthly_hours FLOAT NOT NULL,
+        bet_hours_available FLOAT NOT NULL,
+        polaris_id TEXT NOT NULL,
+        played_yesterday INTEGER NOT NULL DEFAULT 0,
+        weekly_hours FLOAT NOT NULL DEFAULT 0.0,
+        individual_counter INTEGER NOT NULL DEFAULT 0
+    )",
+    [],
+)?;
+            conn.execute(
+                "INSERT INTO users (id, name, playtime, hours_owed, steam_id, monthly_hours, bet_hours_available, polaris_id, played_yesterday, individual_counter) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                (&format!("{}", env::var("JACKSON_ID").unwrap()), "Jackson", 8.33, 20, &format!("{}", env::var("JACKSON_STEAM_ID").unwrap()), 0.0, 0.0, &format!("{}", env::var("JACKSON_POL_ID").unwrap()), 0, 0),
             )?;
             conn.execute(
-                "INSERT INTO users (id, name, playtime, hours_owed, steam_id, monthly_hours, bet_hours_available, polaris_id, played_yesterday) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
-                (&format!("{}", env::var("JACKSON_ID").unwrap()), "Jackson", 8.33, 20, &format!("{}", env::var("JACKSON_STEAM_ID").unwrap()), 0.0, 0.0, &format!("{}", env::var("JACKSON_POL_ID").unwrap()), 0),
+                "INSERT INTO users (id, name, playtime, hours_owed, steam_id, monthly_hours, bet_hours_available, polaris_id, played_yesterday, individual_counter) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                (&format!("{}", env::var("MASON_ID").unwrap()), "Mason", 14.55, 95, &format!("{}", env::var("MASON_STEAM_ID").unwrap()), 0.0, 0.0, &format!("{}", env::var("MASON_POL_ID").unwrap()), 0, 0),
             )?;
             conn.execute(
-                "INSERT INTO users (id, name, playtime, hours_owed, steam_id, monthly_hours, bet_hours_available, polaris_id, played_yesterday) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
-                (&format!("{}", env::var("MASON_ID").unwrap()), "Mason", 14.55, 95, &format!("{}", env::var("MASON_STEAM_ID").unwrap()), 0.0, 0.0, &format!("{}", env::var("MASON_POL_ID").unwrap()), 0),
+                "INSERT INTO users (id, name, playtime, hours_owed, steam_id, monthly_hours, bet_hours_available, polaris_id, played_yesterday, individual_counter) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                (&format!("{}", env::var("JON_ID").unwrap()), "Jonathan", 16.48, 150, &format!("{}", env::var("JON_STEAM_ID").unwrap()), 0.0, 0.0, &format!("{}", env::var("JON_POL_ID").unwrap()), 0, 0),
             )?;
             conn.execute(
-                "INSERT INTO users (id, name, playtime, hours_owed, steam_id, monthly_hours, bet_hours_available, polaris_id, played_yesterday) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
-                (&format!("{}", env::var("JON_ID").unwrap()), "Jonathan", 16.48, 150, &format!("{}", env::var("JON_STEAM_ID").unwrap()), 0.0, 0.0, &format!("{}", env::var("JON_POL_ID").unwrap()), 0),
+                "INSERT INTO users (id, name, playtime, hours_owed, steam_id, monthly_hours, bet_hours_available, polaris_id, played_yesterday, individual_counter) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                (&format!("{}", env::var("LOGAN_ID").unwrap()), "Logan", 35.05, 115, &format!("{}", env::var("LOGAN_STEAM_ID").unwrap()), 0.0, 0.0, &format!("{}", env::var("LOGAN_POL_ID").unwrap()), 0, 0),
             )?;
             conn.execute(
-                "INSERT INTO users (id, name, playtime, hours_owed, steam_id, monthly_hours, bet_hours_available, polaris_id, played_yesterday) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
-                (&format!("{}", env::var("LOGAN_ID").unwrap()), "Logan", 35.05, 115, &format!("{}", env::var("LOGAN_STEAM_ID").unwrap()), 0.0, 0.0, &format!("{}", env::var("LOGAN_POL_ID").unwrap()), 0),
+                "INSERT INTO users (id, name, playtime, hours_owed, steam_id, monthly_hours, bet_hours_available, polaris_id, played_yesterday, individual_counter) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                (&format!("{}", env::var("BRANDON_ID").unwrap()), "Brandon", 66.1, 50, &format!("{}", env::var("BRANDON_STEAM_ID").unwrap()), 0.0, 0.0, "", 0, 0),
             )?;
             conn.execute(
-                "INSERT INTO users (id, name, playtime, hours_owed, steam_id, monthly_hours, bet_hours_available, polaris_id, played_yesterday) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
-                (&format!("{}", env::var("BRANDON_ID").unwrap()), "Brandon", 66.1, 50, &format!("{}", env::var("BRANDON_STEAM_ID").unwrap()), 0.0, 0.0, "", 0),
+                "INSERT INTO users (id, name, playtime, hours_owed, steam_id, monthly_hours, bet_hours_available, polaris_id, played_yesterday, individual_counter) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                (&format!("{}", env::var("WYATT_ID").unwrap()), "Wyatt", 17.1, 15, &format!("{}", env::var("WYATT_STEAM_ID").unwrap()), 0.0, 0.0, "", 0, 0),
             )?;
             conn.execute(
-                "INSERT INTO users (id, name, playtime, hours_owed, steam_id, monthly_hours, bet_hours_available, polaris_id, played_yesterday) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
-                (&format!("{}", env::var("WYATT_ID").unwrap()), "Wyatt", 17.1, 15, &format!("{}", env::var("WYATT_STEAM_ID").unwrap()), 0.0, 0.0, "", 0),
+                "INSERT INTO users (id, name, playtime, hours_owed, steam_id, monthly_hours, bet_hours_available, polaris_id, played_yesterday, individual_counter) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                (&format!("{}", env::var("BRYAN_ID").unwrap()), "Bryan", 2, 2, &format!("{}", env::var("BRYAN_STEAM_ID").unwrap()), 0.0, 0.0, "", 0, 0),
             )?;
             conn.execute(
-                "INSERT INTO users (id, name, playtime, hours_owed, steam_id, monthly_hours, bet_hours_available, polaris_id, played_yesterday) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
-                (&format!("{}", env::var("BRYAN_ID").unwrap()), "Bryan", 2, 2, &format!("{}", env::var("BRYAN_STEAM_ID").unwrap()), 0.0, 0.0, "", 0),
+                "INSERT INTO users (id, name, playtime, hours_owed, steam_id, monthly_hours, bet_hours_available, polaris_id, played_yesterday, individual_counter) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                (&format!("{}", env::var("KWANGWON_ID").unwrap()), "Kwangwon", 2, 2, &format!("{}", env::var("KWANGWON_STEAM_ID").unwrap()), 0.0, 0.0, "", 0, 0),
             )?;
             conn.execute(
-                "INSERT INTO users (id, name, playtime, hours_owed, steam_id, monthly_hours, bet_hours_available, polaris_id, played_yesterday) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
-                (&format!("{}", env::var("KWANGWON_ID").unwrap()), "Kwangwon", 2, 2, &format!("{}", env::var("KWANGWON_STEAM_ID").unwrap()), 0.0, 0.0, "", 0),
-            )?;
-            conn.execute(
-                "INSERT INTO users (id, name, playtime, hours_owed, steam_id, monthly_hours, bet_hours_available, polaris_id, played_yesterday) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
-                (&format!("{}", env::var("KRIS_ID").unwrap()), "Kris", 2, 2, &format!("{}", env::var("KRIS_STEAM_ID").unwrap()), 0.0, 0.0, "", 0),
+                "INSERT INTO users (id, name, playtime, hours_owed, steam_id, monthly_hours, bet_hours_available, polaris_id, played_yesterday, individual_counter) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                (&format!("{}", env::var("KRIS_ID").unwrap()), "Kris", 2, 2, &format!("{}", env::var("KRIS_STEAM_ID").unwrap()), 0.0, 0.0, "", 0, 0),
             )?;
         }
         // DB migration statements
@@ -217,6 +229,12 @@ pub fn init_db() -> Result<Connection> {
                 [],
             )?;
         }
+        if !columns.contains(&"individual_counter".to_string()) {
+            conn.execute(
+                "ALTER TABLE users ADD COLUMN individual_counter INTEGER NOT NULL DEFAULT 0",
+                [],
+            )?;
+        }
         // Every time the db get intitalized it means that we are updating the bot
         // the update may not happen in a single day so its better to be able to control
         // the day counter whenever we choose to launch the bot
@@ -239,7 +257,7 @@ pub fn init_db() -> Result<Connection> {
         // Make sure to check that this is right before deployment lol
         conn.execute(
             "INSERT INTO time (month, week, year, zero_day_streak) VALUES (?1, ?2, ?3, ?4)",
-            (4, 1, 2026, 0),
+            (7, 5, 2026, 0),
         )?;
     }
     Ok(conn)
@@ -259,6 +277,7 @@ pub fn get_users(conn: &Connection) -> Result<Vec<User>, rusqlite::Error> {
             polaris_id: row.get(7)?,
             played_yesterday: row.get(8)?,
             weekly_hours: row.get(9)?,
+            individual_counter: row.get(10)?,
         })
     })?;
     let users: Result<Vec<User>> = user_collection.collect();
@@ -267,8 +286,8 @@ pub fn get_users(conn: &Connection) -> Result<Vec<User>, rusqlite::Error> {
 
 pub fn update_user(conn: &Connection, user: User) -> rusqlite::Result<()> {
     conn.execute(
-        "UPDATE users SET playtime = ?, hours_owed = ?, monthly_hours = ?, weekly_hours = ?, bet_hours_available = ?, played_yesterday = ? WHERE id = ?",
-        params![user.playtime, user.hours_owed, user.monthly_hours, user.weekly_hours, user.bet_hours_available, user.played_yesterday, user.id],
+        "UPDATE users SET playtime = ?, hours_owed = ?, monthly_hours = ?, weekly_hours = ?, bet_hours_available = ?, played_yesterday = ?, individual_counter = ? WHERE id = ?",
+        params![user.playtime, user.hours_owed, user.monthly_hours, user.weekly_hours, user.bet_hours_available, user.played_yesterday, user.individual_counter, user.id],
     )?;
     Ok(())
 }
@@ -300,6 +319,7 @@ pub fn bet_result(conn: &Connection, amount: f32, id: &str) -> rusqlite::Result<
             polaris_id: row.get(7)?,
             played_yesterday: row.get(8)?,
             weekly_hours: row.get(9)?,
+            individual_counter: row.get(10)?,
         })
     })?;
     let mut bet_total = amount;
@@ -353,6 +373,7 @@ pub fn get_user(conn: &Connection, id: &str) -> Result<Option<User>> {
             polaris_id: row.get(7)?,
             played_yesterday: row.get(8)?,
             weekly_hours: row.get(9)?,
+            individual_counter: row.get(10)?,
         };
         Ok(Some(user))
     } else {
@@ -405,6 +426,7 @@ mod tests {
             "steam123".to_string(),
             0.0,
             5.0,
+            0,
             0.0,
             "polar1".to_string(),
             0,
@@ -474,6 +496,7 @@ mod db_mock_tests {
             "steam_1".to_string(),
             0.0,
             0.0,
+            0,
             0.0,
             "polar_1".to_string(),
             0,
@@ -495,6 +518,7 @@ mod db_mock_tests {
             "steam_1".to_string(),
             0.0,
             0.0,
+            0,
             0.0,
             "polar_1".to_string(),
             0,
@@ -520,6 +544,7 @@ mod db_mock_tests {
             "steam_1".to_string(),
             0.0,
             0.0,
+            0,
             0.0,
             "polar_1".to_string(),
             0,
@@ -542,6 +567,7 @@ mod db_mock_tests {
             "steam_1".to_string(),
             0.0,
             0.0,
+            0,
             0.0,
             "polar_1".to_string(),
             0,
@@ -566,6 +592,7 @@ mod db_mock_tests {
             "steam_1".to_string(),
             0.0,
             0.0,
+            0,
             0.0,
             "polar_1".to_string(),
             0,

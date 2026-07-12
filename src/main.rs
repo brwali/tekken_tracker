@@ -94,8 +94,8 @@ impl EventHandler for Handler {
         }
         let tree_channel = ChannelId::new(TREE_CHANNEL_ID);
         let kazoo_channel = ChannelId::new(KAZOO_CHANNEL_ID);
-        let release_message = "Hot fix: There may or may not have been a scenario where the weekly hours played wouldn't update automatically ;). \
-                                That is now fixed :D (for those angry at the tekken bot, this was manually fixed for every instance the bot failed)";
+        let release_message = "Feature update :D, long awaited feature to track individual days since last played for debtors. Hopefully I didn't \
+                                break anything, please let me know if I did.";
         let _ =
             tree_channel
             .say(&ctx.http, release_message)
@@ -524,7 +524,7 @@ impl EventHandler for Handler {
                             .unwrap()
                             .update_hour_change(new_wizard.clone(), 0.0);
                         let newbie = User::new(
-                            new_wizard, name, playtime, hours_owed, steam_id, 0.0, 0.0, 10.0,
+                            new_wizard, name, playtime, hours_owed, steam_id, 0.0, 0.0, 0, 10.0,
                             polaris_id, 0,
                         );
                         // now update the db

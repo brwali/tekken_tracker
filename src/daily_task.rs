@@ -114,6 +114,7 @@ async fn update_debt_hours(
     let ewgf_key = env::var("EWGF_KEY").expect("Expected a token in the environment");
     let _tekken_id = 1778820;
     let mut message = String::from("Tekken debtors:\n");
+    let mut individual_playtime_string = String::from("Days since debtors played (individual):\n");
     let db_connection = db.lock().unwrap();
     let mut new_week = false;
     let mut new_month = false;
@@ -162,6 +163,7 @@ async fn update_debt_hours(
                 let total_hours = user.get_hours_owed();
                 let steam_id = user.get_steamid().to_string();
                 let birth_name = user.get_name().to_string();
+                let individual_counter = user.get_individual_counter();
                 let mut playtime_outer = hours;
                 if hours < total_hours {
                     let request = format!(
@@ -196,6 +198,8 @@ async fn update_debt_hours(
                     let daily_playtime = round_after_math(playtime_outer - hours);
                     let mut played_today = false;
                     if hours == playtime_outer {
+                        user.set_individual_counter(individual_counter + 1);
+                        individual_playtime_string.push_str(&format!("{} has not played in {} days :(\n", birth_name, user.get_individual_counter()));
                         if new_week {
                             message.push_str(&format!("<@{}> has played {} hours and has {} hours left to go!\nThey have played ZERO tekken hours within the last 24 hours :(\n", name, playtime_outer, hours_left));
                         } else {
@@ -216,6 +220,8 @@ async fn update_debt_hours(
                         played_today = true;
                         total_hours_today += daily_playtime;
                         user.set_playtime(playtime_outer);
+                        user.set_individual_counter(0);
+                        individual_playtime_string.push_str(&format!("{} broke their streak and played :)\n", birth_name));
                         let monthly_hours = user.get_monthly_hours();
                         user.set_monthly_hours(round_after_math(monthly_hours + daily_playtime));
                         let weekly_hours = user.get_weekly_hours();
@@ -290,6 +296,7 @@ async fn update_debt_hours(
                     Err(e) => println!("Update failed: {:?}", e),
                 }
             }
+            message.push_str(&individual_playtime_string);
             if total_hours_today > 0.0 {
                 zero_day_streak = 0;
                 message.push_str(&format!(
