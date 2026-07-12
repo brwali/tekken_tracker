@@ -478,7 +478,8 @@ mod db_mock_tests {
                 bet_hours_available FLOAT NOT NULL,
                 polaris_id TEXT NOT NULL,
                 played_yesterday INT NOT NULL DEFAULT 0,
-                weekly_hours FLOAT NOT NULL DEFAULT 0.0
+                weekly_hours FLOAT NOT NULL DEFAULT 0.0,
+                individual_counter INTEGER NOT NULL DEFAULT 0
             )",
             [],
         ).unwrap();
