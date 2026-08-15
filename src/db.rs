@@ -415,8 +415,8 @@ pub fn update_time(conn: &Connection, time: Time) -> rusqlite::Result<()> {
 
 pub fn add_user(conn: &Connection, new_user: User) -> rusqlite::Result<()> {
     conn.execute(
-        "INSERT INTO users (id, name, playtime, hours_owed, steam_id, monthly_hours, bet_hours_available, polaris_id, played_yesterday) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
-        (new_user.get_id(), new_user.get_name(), new_user.get_playtime(), new_user.get_hours_owed(), new_user.get_hours_owed(), 0.0, 10.0, new_user.get_polar_id(), 0),
+        "INSERT INTO users (id, name, playtime, hours_owed, steam_id, monthly_hours, bet_hours_available, polaris_id, played_yesterday, interest_accrued) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+        (new_user.get_id(), new_user.get_name(), new_user.get_playtime(), new_user.get_hours_owed(), new_user.get_hours_owed(), 0.0, 10.0, new_user.get_polar_id(), 0, new_user.get_interest_accrued()),
     )?;
     Ok(())
 }
@@ -505,7 +505,8 @@ mod db_mock_tests {
                 polaris_id TEXT NOT NULL,
                 played_yesterday INT NOT NULL DEFAULT 0,
                 weekly_hours FLOAT NOT NULL DEFAULT 0.0,
-                individual_counter INTEGER NOT NULL DEFAULT 0
+                individual_counter INTEGER NOT NULL DEFAULT 0,
+                interest_accrued FLOAT NOT NULL DEFAULT 0.0
             )",
             [],
         )
