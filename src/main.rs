@@ -94,16 +94,10 @@ impl EventHandler for Handler {
         }
         let tree_channel = ChannelId::new(TREE_CHANNEL_ID);
         let kazoo_channel = ChannelId::new(KAZOO_CHANNEL_ID);
-        let release_message = "Feature update :D, long awaited feature to track individual days since last played for debtors. Hopefully I didn't \
-                                break anything, please let me know if I did.";
-        let _ =
-            tree_channel
-            .say(&ctx.http, release_message)
-            .await;
-        let _ =
-            kazoo_channel
-            .say(&ctx.http, release_message)
-            .await;
+        let release_message =
+            "New feature :D! Better formatted daily message plus separate interest tracking!! I also have to manually update the interest part so that will show up tomorrow";
+        let _ = tree_channel.say(&ctx.http, release_message).await;
+        let _ = kazoo_channel.say(&ctx.http, release_message).await;
         tokio::spawn({
             let http = ctx.http.clone();
             let db_connection = self.db.clone();
@@ -116,15 +110,51 @@ impl EventHandler for Handler {
                 loop {
                     // Run blocking DB logic in spawn_blocking
                     let db_clone = db_connection.clone();
-                    let (message, no_one_played_today) = tokio::task::spawn_blocking(move || {
-                        // daily_check must be sync or block_on if async
-                        let mut bet_handler = BET_HANDLER.lock().unwrap();
-                        tokio::runtime::Handle::current()
-                            .block_on(daily_task::daily_check(db_clone, &mut *bet_handler))
-                    })
-                    .await
-                    .expect("spawn_blocking failed");
+                    let (message, no_one_played_today, user_vec) =
+                        tokio::task::spawn_blocking(move || {
+                            // daily_check must be sync or block_on if async
+                            let mut bet_handler = BET_HANDLER.lock().unwrap();
+                            tokio::runtime::Handle::current()
+                                .block_on(daily_task::daily_check(db_clone, &mut *bet_handler))
+                        })
+                        .await
+                        .expect("spawn_blocking failed");
+                    for user in user_vec {
+                        let color;
+                        if user.color == "Red" {
+                            color = Color::from_rgb(255, 0, 0);
+                        } else {
+                            color = Color::from_rgb(0, 255, 0);
+                        }
+                        let name = user.name;
+                        let int_acc = user.total_interest_accrued;
+                        let embed = serenity::builder::CreateEmbed::new()
+                            .title(&format!("Player: {}", name.to_string()))
+                            .colour(color)
+                            .field("Total Playtime", user.total_playtime, true)
+                            .field("Amount Left", user.amount_left, true)
+                            .field("Playtime Today", user.playtime_today, true)
+                            .field(
+                                "Number of Days Since Last Played",
+                                user.days_last_played,
+                                true,
+                            )
+                            .field(
+                                "Total Interest Accrued",
+                                &format!("`Number of interest hours {}`", int_acc),
+                                true,
+                            );
 
+                        let builder = serenity::builder::CreateMessage::new().embed(embed);
+                        let tree_id = ChannelId::new(TREE_CHANNEL_ID);
+                        let _ = tree_id.send_message(&http, builder.clone()).await;
+                        let kazoo_id = ChannelId::new(KAZOO_CHANNEL_ID);
+                        let _ = kazoo_id.send_message(&http, builder).await;
+                        if user.matches != "None" {
+                            let _ = tree_id.say(&http, user.matches.to_string()).await;
+                            let _ = kazoo_id.say(&http, user.matches.to_string()).await;
+                        }
+                    }
                     let tree_id = ChannelId::new(TREE_CHANNEL_ID);
                     for chunk in message.as_bytes().chunks(DISCORD_LIMIT) {
                         let chunk_str =
@@ -525,7 +555,7 @@ impl EventHandler for Handler {
                             .update_hour_change(new_wizard.clone(), 0.0);
                         let newbie = User::new(
                             new_wizard, name, playtime, hours_owed, steam_id, 0.0, 0.0, 0, 10.0,
-                            polaris_id, 0,
+                            polaris_id, 0, 0.0,
                         );
                         // now update the db
                         {
@@ -546,8 +576,13 @@ impl EventHandler for Handler {
                         let new_hours = parts[2].parse::<f32>().unwrap_or(-1.0);
                         let new_monthly = parts[3].parse::<f32>().unwrap_or(-1.0);
                         let new_weekly = parts[4].parse::<f32>().unwrap_or(-1.0);
+                        let new_int_acc = parts[5].parse::<f32>().unwrap_or(-1.0);
                         let http = ctx.http.clone();
-                        if new_hours == -1.0 || new_monthly == -1.0 || new_weekly == -1.0 {
+                        if new_hours == -1.0
+                            || new_monthly == -1.0
+                            || new_weekly == -1.0
+                            || new_int_acc == -1.0
+                        {
                             let _ = msg.channel_id.say(&http, "Invalid hour amount").await;
                         } else {
                             // Another instance of the db needing its own scope because we want to send a
@@ -555,11 +590,17 @@ impl EventHandler for Handler {
                             {
                                 let db = self.db.clone();
                                 let db_connection = db.lock().unwrap();
-                                match db::update_hours_owed(&db_connection, &new_wizard, new_hours, new_monthly, new_weekly) {
+                                match db::update_hours_owed(
+                                    &db_connection,
+                                    &new_wizard,
+                                    new_hours,
+                                    new_monthly,
+                                    new_weekly,
+                                    new_int_acc,
+                                ) {
                                     Ok(_) => println!("Update successful"),
                                     Err(e) => println!("Update failed: {:?}", e),
                                 }
-                                        
                             }
                             let _ = msg
                                 .channel_id
@@ -595,8 +636,14 @@ impl EventHandler for Handler {
                         let parts: Vec<&str> = msg.content.split_whitespace().collect();
                         let polaris_id = parts[1].to_string();
                         let name = parts[2].to_string();
-                        let stat_message =
-                            daily_task::match_analysis(&polaris_id, &ewgf_key, 1.0, &name, Some("https://api.ewgf.gg".to_string())).await;
+                        let stat_message = daily_task::match_analysis(
+                            &polaris_id,
+                            &ewgf_key,
+                            1.0,
+                            &name,
+                            Some("https://api.ewgf.gg".to_string()),
+                        )
+                        .await;
                         // send a success message
                         let http = ctx.http.clone();
                         let _ = msg.channel_id.say(&http, stat_message.clone()).await;

@@ -14,6 +14,7 @@ pub struct User {
     polaris_id: String,
     played_yesterday: i32,
     individual_counter: i32,
+    interest_accrued: f32,
 }
 
 #[derive(Clone)]
@@ -74,6 +75,7 @@ impl User {
         bet_hours_available: f32,
         polaris_id: String,
         played_yesterday: i32,
+        interest_accrued: f32,
     ) -> Self {
         User {
             id,
@@ -87,6 +89,7 @@ impl User {
             bet_hours_available,
             polaris_id,
             played_yesterday,
+            interest_accrued,
         }
     }
     pub fn get_id(&self) -> &str {
@@ -113,6 +116,9 @@ impl User {
     pub fn get_weekly_hours(&self) -> f32 {
         self.weekly_hours
     }
+    pub fn get_interest_accrued(&self) -> f32 {
+        self.interest_accrued
+    }
     pub fn get_playtime(&self) -> f32 {
         self.playtime
     }
@@ -130,6 +136,9 @@ impl User {
     }
     pub fn set_bet_hours_available(&mut self, new_val: f32) {
         self.bet_hours_available = new_val;
+    }
+    pub fn set_interest_accrued(&mut self, new_val: f32) {
+        self.interest_accrued = new_val;
     }
     pub fn set_playtime(&mut self, new_val: f32) {
         self.playtime = new_val;
@@ -150,7 +159,7 @@ pub fn init_db() -> Result<Connection> {
         let table_exists = stmt.exists([])?;
         if !table_exists {
             conn.execute(
-    "CREATE TABLE IF NOT EXISTS users (
+                "CREATE TABLE IF NOT EXISTS users (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
         playtime FLOAT NOT NULL,
@@ -163,11 +172,11 @@ pub fn init_db() -> Result<Connection> {
         weekly_hours FLOAT NOT NULL DEFAULT 0.0,
         individual_counter INTEGER NOT NULL DEFAULT 0
     )",
-    [],
-)?;
+                [],
+            )?;
             conn.execute(
                 "INSERT INTO users (id, name, playtime, hours_owed, steam_id, monthly_hours, bet_hours_available, polaris_id, played_yesterday, individual_counter) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
-                (&format!("{}", env::var("JACKSON_ID").unwrap()), "Jackson", 8.33, 20, &format!("{}", env::var("JACKSON_STEAM_ID").unwrap()), 0.0, 0.0, &format!("{}", env::var("JACKSON_POL_ID").unwrap()), 0, 0),
+                (&format!("{}", env::var("JACKSON_ID").unwrap()), "Jackson", 8.33, 18, &format!("{}", env::var("JACKSON_STEAM_ID").unwrap()), 0.0, 0.0, &format!("{}", env::var("JACKSON_POL_ID").unwrap()), 0, 0),
             )?;
             conn.execute(
                 "INSERT INTO users (id, name, playtime, hours_owed, steam_id, monthly_hours, bet_hours_available, polaris_id, played_yesterday, individual_counter) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
@@ -235,6 +244,12 @@ pub fn init_db() -> Result<Connection> {
                 [],
             )?;
         }
+        if !columns.contains(&"interest_accrued".to_string()) {
+            conn.execute(
+                "ALTER TABLE users ADD COLUMN interest_accrued FLOAT NOT NULL DEFAULT 0.0",
+                [],
+            )?;
+        }
         // Every time the db get intitalized it means that we are updating the bot
         // the update may not happen in a single day so its better to be able to control
         // the day counter whenever we choose to launch the bot
@@ -257,7 +272,7 @@ pub fn init_db() -> Result<Connection> {
         // Make sure to check that this is right before deployment lol
         conn.execute(
             "INSERT INTO time (month, week, year, zero_day_streak) VALUES (?1, ?2, ?3, ?4)",
-            (7, 5, 2026, 0),
+            (8, 5, 2026, 0),
         )?;
     }
     Ok(conn)
@@ -278,6 +293,7 @@ pub fn get_users(conn: &Connection) -> Result<Vec<User>, rusqlite::Error> {
             played_yesterday: row.get(8)?,
             weekly_hours: row.get(9)?,
             individual_counter: row.get(10)?,
+            interest_accrued: row.get(11)?,
         })
     })?;
     let users: Result<Vec<User>> = user_collection.collect();
@@ -286,8 +302,8 @@ pub fn get_users(conn: &Connection) -> Result<Vec<User>, rusqlite::Error> {
 
 pub fn update_user(conn: &Connection, user: User) -> rusqlite::Result<()> {
     conn.execute(
-        "UPDATE users SET playtime = ?, hours_owed = ?, monthly_hours = ?, weekly_hours = ?, bet_hours_available = ?, played_yesterday = ?, individual_counter = ? WHERE id = ?",
-        params![user.playtime, user.hours_owed, user.monthly_hours, user.weekly_hours, user.bet_hours_available, user.played_yesterday, user.individual_counter, user.id],
+        "UPDATE users SET playtime = ?, hours_owed = ?, monthly_hours = ?, weekly_hours = ?, bet_hours_available = ?, played_yesterday = ?, individual_counter = ?, interest_accrued = ? WHERE id = ?",
+        params![user.playtime, user.hours_owed, user.monthly_hours, user.weekly_hours, user.bet_hours_available, user.played_yesterday, user.individual_counter, user.interest_accrued, user.id],
     )?;
     Ok(())
 }
@@ -320,6 +336,7 @@ pub fn bet_result(conn: &Connection, amount: f32, id: &str) -> rusqlite::Result<
             played_yesterday: row.get(8)?,
             weekly_hours: row.get(9)?,
             individual_counter: row.get(10)?,
+            interest_accrued: row.get(11)?,
         })
     })?;
     let mut bet_total = amount;
@@ -334,7 +351,7 @@ pub fn bet_result(conn: &Connection, amount: f32, id: &str) -> rusqlite::Result<
             weekly_change = clone_user.get_weekly_hours();
         }
     }
-    
+
     conn.execute(
         "UPDATE users SET hours_owed = ?, weekly_hours = ? WHERE id = ?",
         params![bet_total, weekly_change, id],
@@ -374,6 +391,7 @@ pub fn get_user(conn: &Connection, id: &str) -> Result<Option<User>> {
             played_yesterday: row.get(8)?,
             weekly_hours: row.get(9)?,
             individual_counter: row.get(10)?,
+            interest_accrued: row.get(11)?,
         };
         Ok(Some(user))
     } else {
@@ -403,10 +421,17 @@ pub fn add_user(conn: &Connection, new_user: User) -> rusqlite::Result<()> {
     Ok(())
 }
 
-pub fn update_hours_owed(conn: &Connection, id: &str, hours: f32, monthly_hours: f32, weekly_hours: f32) -> rusqlite::Result<()> {
+pub fn update_hours_owed(
+    conn: &Connection,
+    id: &str,
+    hours: f32,
+    monthly_hours: f32,
+    weekly_hours: f32,
+    interest_accrued: f32,
+) -> rusqlite::Result<()> {
     conn.execute(
-        "UPDATE users SET hours_owed = ?, monthly_hours = ?, weekly_hours = ? WHERE id = ?",
-        params![hours, monthly_hours, weekly_hours, id],
+        "UPDATE users SET hours_owed = ?, monthly_hours = ?, weekly_hours = ?, interest_accrued = ? WHERE id = ?",
+        params![hours, monthly_hours, weekly_hours, interest_accrued, id],
     )?;
     Ok(())
 }
@@ -430,6 +455,7 @@ mod tests {
             0.0,
             "polar1".to_string(),
             0,
+            1.1,
         );
         assert_eq!(u.get_id(), "id1");
         assert_eq!(u.get_name(), "Alice");
@@ -482,7 +508,8 @@ mod db_mock_tests {
                 individual_counter INTEGER NOT NULL DEFAULT 0
             )",
             [],
-        ).unwrap();
+        )
+        .unwrap();
         conn
     }
 
@@ -501,9 +528,10 @@ mod db_mock_tests {
             0.0,
             "polar_1".to_string(),
             0,
+            1.1,
         );
         add_user(&conn, u).unwrap();
-        
+
         let fetched = get_user(&conn, "test_id").unwrap().unwrap();
         assert_eq!(fetched.get_name(), "test_name");
     }
@@ -523,13 +551,14 @@ mod db_mock_tests {
             0.0,
             "polar_1".to_string(),
             0,
+            1.1,
         );
         add_user(&conn, u).unwrap();
-        
+
         let mut u_updated = get_user(&conn, "test_id").unwrap().unwrap();
         u_updated.set_playtime(20.5);
         update_user(&conn, u_updated).unwrap();
-        
+
         let fetched_updated = get_user(&conn, "test_id").unwrap().unwrap();
         assert_relative_eq!(fetched_updated.get_playtime(), 20.5);
     }
@@ -549,9 +578,10 @@ mod db_mock_tests {
             0.0,
             "polar_1".to_string(),
             0,
+            1.1,
         );
         add_user(&conn, u).unwrap();
-        
+
         update_user_column(&conn, "polar_2", "test_id").unwrap();
         let fetched_updated = get_user(&conn, "test_id").unwrap().unwrap();
         assert_eq!(fetched_updated.get_polar_id(), "polar_2");
@@ -572,10 +602,11 @@ mod db_mock_tests {
             0.0,
             "polar_1".to_string(),
             0,
+            1.1,
         );
         add_user(&conn, u).unwrap();
 
-        update_hours_owed(&conn, "test_id", 33.3, 11.1, 22.2).unwrap();
+        update_hours_owed(&conn, "test_id", 33.3, 11.1, 22.2, 1.1).unwrap();
         let fetched = get_user(&conn, "test_id").unwrap().unwrap();
         assert_relative_eq!(fetched.get_hours_owed(), 33.3);
         assert_relative_eq!(fetched.get_monthly_hours(), 11.1);
@@ -597,11 +628,12 @@ mod db_mock_tests {
             0.0,
             "polar_1".to_string(),
             0,
+            1.1,
         );
-        
+
         add_user(&conn, u).unwrap();
         bet_result(&conn, -5.0, "test_id").unwrap();
-        
+
         let fetched = get_user(&conn, "test_id").unwrap().unwrap();
         assert_relative_eq!(fetched.get_hours_owed(), 5.0);
         assert_relative_eq!(fetched.get_weekly_hours(), 5.0);

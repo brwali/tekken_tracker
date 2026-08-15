@@ -12,6 +12,32 @@ use std::sync::{Arc, Mutex};
 
 // Global consts
 pub const TEKKEN_APP_ID: u64 = 1778820;
+#[derive(Debug)]
+pub struct UserInfo {
+    pub name: String,
+    pub total_playtime: String,
+    pub amount_left: String,
+    pub playtime_today: String,
+    pub days_last_played: String,
+    pub total_interest_accrued: f32,
+    pub color: String,
+    pub matches: String,
+}
+
+impl UserInfo {
+    pub fn new() -> Self {
+        UserInfo {
+            name: "".to_string(),
+            total_playtime: "".to_string(),
+            amount_left: "".to_string(),
+            playtime_today: "".to_string(),
+            days_last_played: "".to_string(),
+            total_interest_accrued: 0.0,
+            color: "Red".to_string(),
+            matches: "None".to_string(),
+        }
+    }
+}
 
 pub async fn get_request(request: &str, token: Option<&str>) -> Option<Value> {
     let client = ReqwestClient::new();
@@ -108,13 +134,13 @@ pub async fn match_analysis(
 async fn update_debt_hours(
     db: Arc<Mutex<Connection>>,
     bet_handler: &mut BetOverlord,
-) -> (String, bool) {
+) -> (String, bool, Vec<UserInfo>) {
     dotenv::dotenv().ok();
     let api_key = env::var("API_KEY").expect("Expected a token in the environment");
     let ewgf_key = env::var("EWGF_KEY").expect("Expected a token in the environment");
     let _tekken_id = 1778820;
     let mut message = String::from("Tekken debtors:\n");
-    let mut individual_playtime_string = String::from("Days since debtors played (individual):\n");
+    let mut user_vec = Vec::<UserInfo>::new();
     let db_connection = db.lock().unwrap();
     let mut new_week = false;
     let mut new_month = false;
@@ -152,7 +178,11 @@ async fn update_debt_hours(
             }
         }
         Err(e) => {
-            return (format!("Database error: {:?}", e).to_string(), false);
+            return (
+                format!("Database error: {:?}", e).to_string(),
+                false,
+                user_vec,
+            );
         }
     }
     match db::get_users(&db_connection) {
@@ -165,6 +195,8 @@ async fn update_debt_hours(
                 let birth_name = user.get_name().to_string();
                 let individual_counter = user.get_individual_counter();
                 let mut playtime_outer = hours;
+                let mut user_info = UserInfo::new();
+                user_info.name = birth_name.to_string();
                 if hours < total_hours {
                     let request = format!(
                         "https://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/?key={}&steamid={}&format=json",
@@ -196,16 +228,20 @@ async fn update_debt_hours(
                     }
                     let hours_left = round_after_math(total_hours - playtime_outer);
                     let daily_playtime = round_after_math(playtime_outer - hours);
+                    user_info.amount_left =
+                        String::from(&format!("`has {} hours left to go!`", hours_left));
+                    user_info.total_playtime =
+                        String::from(&format!("`has played {} hours!`", playtime_outer));
                     let mut played_today = false;
                     if hours == playtime_outer {
                         user.set_individual_counter(individual_counter + 1);
-                        individual_playtime_string.push_str(&format!("{} has not played in {} days :(\n", birth_name, user.get_individual_counter()));
-                        if new_week {
-                            message.push_str(&format!("<@{}> has played {} hours and has {} hours left to go!\nThey have played ZERO tekken hours within the last 24 hours :(\n", name, playtime_outer, hours_left));
-                        } else {
-                            message.push_str(&format!("{} has played {} hours and has {} hours left to go!\nThey have played ZERO tekken hours within the last 24 hours :(\n\n", birth_name, playtime_outer, hours_left));
-                        }
+                        user_info.days_last_played = String::from(&format!(
+                            "`has not played in {} days :(`",
+                            user.get_individual_counter()
+                        ));
+                        user_info.playtime_today = String::from("`has played ZERO hours today!`");
                     } else if playtime_outer >= total_hours {
+                        //TODO: update this to new format sometime
                         let body = format!(
                             ":rocket: {} finally finished playing their {} hours owed!!!!! :rocket:",
                             birth_name, total_hours
@@ -216,21 +252,21 @@ async fn update_debt_hours(
                         let border = rocket_unit.repeat(border_count);
                         let vic_message = format!("{}\n{}\n{}\n", border, body, border);
                         message.push_str(&vic_message);
+                        user.set_playtime(playtime_outer);
                     } else {
                         played_today = true;
                         total_hours_today += daily_playtime;
+                        user_info.playtime_today =
+                            String::from(&format!("`has played {} hours today!`", daily_playtime));
+                        user_info.days_last_played =
+                            String::from("`broke their streak and played!`");
+                        user_info.color = String::from("Green");
                         user.set_playtime(playtime_outer);
                         user.set_individual_counter(0);
-                        individual_playtime_string.push_str(&format!("{} broke their streak and played :)\n", birth_name));
                         let monthly_hours = user.get_monthly_hours();
                         user.set_monthly_hours(round_after_math(monthly_hours + daily_playtime));
                         let weekly_hours = user.get_weekly_hours();
                         user.set_weekly_hours(round_after_math(weekly_hours + daily_playtime));
-                        if new_week {
-                            message.push_str(&format!("<@{}> has played {} hours and has {} hours left to go!\nThey have played {} tekken hours since last time, way to go :D!!!\n", name, playtime_outer, hours_left, daily_playtime));
-                        } else {
-                            message.push_str(&format!("{} has played {} hours and has {} hours left to go!\nThey have played {} tekken hours since last time, way to go :D!!!\n\n", birth_name, playtime_outer, hours_left, daily_playtime));
-                        }
                     }
                     // Due to API restraints we can only get matches with a 24 hour delay
                     // so if they played yesterday get match history
@@ -243,17 +279,22 @@ async fn update_debt_hours(
                             Some("https://api.ewgf.gg".to_string()),
                         )
                         .await;
-                        message.push_str(&matches);
-                        message.push_str("\n");
+                        user_info.matches = matches.to_string();
                         user.set_played_yesterday(0);
                     } else if played_today && user.get_played_yesterday() == 0 {
                         user.set_played_yesterday(1);
                     }
                     // If its a new month and we need to see if interest should be added
+                    user_info.total_interest_accrued = user.get_interest_accrued();
                     if new_month {
                         let monthy_hours = user.get_monthly_hours();
                         if monthy_hours < 5.0 {
                             playtime_outer = total_hours + (hours_left * 0.05);
+                            // Come back and fix this when db is updated
+                            user.set_interest_accrued(
+                                user.get_interest_accrued() + (hours_left * 0.05),
+                            );
+                            user_info.total_interest_accrued = user.get_interest_accrued();
                             playtime_outer = round_after_math(playtime_outer);
                             user.set_hours_owed(playtime_outer);
                             message.push_str(&format!("<@{}> has not played their 5 monthly tekken hours and has incurred the 5% interest penalty. They now owe {} more hours D:\n\n", name, round_after_math(hours_left*0.05)));
@@ -261,6 +302,7 @@ async fn update_debt_hours(
                         // reset monthly play counter
                         user.set_monthly_hours(0.0);
                     }
+                    user_vec.push(user_info);
                 }
                 // Check to see if its a new week and if so reset available betting hours
                 if new_week {
@@ -296,7 +338,6 @@ async fn update_debt_hours(
                     Err(e) => println!("Update failed: {:?}", e),
                 }
             }
-            message.push_str(&individual_playtime_string);
             if total_hours_today > 0.0 {
                 zero_day_streak = 0;
                 message.push_str(&format!(
@@ -321,15 +362,15 @@ async fn update_debt_hours(
     time.set_zero_day_streak(zero_day_streak);
     // Update time DB table
     let _ = db::update_time(&db_connection, time.clone());
-    (message, total_hours_today == 0.0)
+    (message, total_hours_today == 0.0, user_vec)
 }
 
 pub async fn daily_check(
     db: Arc<Mutex<Connection>>,
     bet_handler: &mut BetOverlord,
-) -> (String, bool) {
-    let (message, no_one_played_today) = update_debt_hours(db.clone(), bet_handler).await;
-    (message, no_one_played_today)
+) -> (String, bool, Vec<UserInfo>) {
+    let (message, no_one_played_today, user_vec) = update_debt_hours(db.clone(), bet_handler).await;
+    (message, no_one_played_today, user_vec)
 }
 
 pub fn get_user_debts(db: Arc<Mutex<Connection>>) -> String {
@@ -385,7 +426,7 @@ mod mock_tests {
     #[tokio::test]
     async fn test_match_analysis_wins() {
         let mut server = Server::new_async().await;
-        
+
         let payload = json!({
             "data": [
                 {
@@ -399,14 +440,23 @@ mod mock_tests {
             ]
         });
 
-        let mock_endpoint = server.mock("GET", "/external/battles/polaris-123")
+        let mock_endpoint = server
+            .mock("GET", "/external/battles/polaris-123")
             .with_status(200)
             .with_header("content-type", "application/json")
             .with_body(payload.to_string())
-            .create_async().await;
+            .create_async()
+            .await;
 
-        let result = match_analysis("polaris-123", "dummy_token", 5.0, "Jackson", Some(server.url())).await;
-        
+        let result = match_analysis(
+            "polaris-123",
+            "dummy_token",
+            5.0,
+            "Jackson",
+            Some(server.url()),
+        )
+        .await;
+
         assert!(result.contains("1 matches were played!! 1 wins, 0 losses, 0 draws"));
         mock_endpoint.assert_async().await;
     }
