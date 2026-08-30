@@ -94,8 +94,7 @@ impl EventHandler for Handler {
         }
         let tree_channel = ChannelId::new(TREE_CHANNEL_ID);
         let kazoo_channel = ChannelId::new(KAZOO_CHANNEL_ID);
-        let release_message =
-            "New feature :D! Better formatted daily message plus separate interest tracking!! I also have to manually update the interest part so that will show up tomorrow";
+        let release_message = "Minor feature, daily message now displays weekly and monthly playtime. Also if monthly playtime target is hit then the debtor will avoid being kicked from call.";
         let _ = tree_channel.say(&ctx.http, release_message).await;
         let _ = kazoo_channel.say(&ctx.http, release_message).await;
         tokio::spawn({
@@ -134,6 +133,8 @@ impl EventHandler for Handler {
                             .field("Total Playtime", user.total_playtime, true)
                             .field("Amount Left", user.amount_left, true)
                             .field("Playtime Today", user.playtime_today, true)
+                            .field("Hours played this week", user.weekly_playtime, true)
+                            .field("Hours played this month", user.monthly_playtime, true)
                             .field(
                                 "Number of Days Since Last Played",
                                 user.days_last_played,
@@ -231,8 +232,9 @@ impl EventHandler for Handler {
             return;
         }
         let weekly_hours = joined_user.get_weekly_hours();
+        let monthly_hours = joined_user.get_monthly_hours();
 
-        if weekly_hours >= 1.25 {
+        if weekly_hours >= 1.25 || monthly_hours >= 5.0 {
             return;
         }
         tokio::spawn({

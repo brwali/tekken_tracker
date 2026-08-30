@@ -272,7 +272,7 @@ pub fn init_db() -> Result<Connection> {
         // Make sure to check that this is right before deployment lol
         conn.execute(
             "INSERT INTO time (month, week, year, zero_day_streak) VALUES (?1, ?2, ?3, ?4)",
-            (8, 5, 2026, 0),
+            (8, 6, 2026, 10),
         )?;
     }
     Ok(conn)

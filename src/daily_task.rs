@@ -20,6 +20,8 @@ pub struct UserInfo {
     pub playtime_today: String,
     pub days_last_played: String,
     pub total_interest_accrued: f32,
+    pub weekly_playtime: String,
+    pub monthly_playtime: String,
     pub color: String,
     pub matches: String,
 }
@@ -32,6 +34,8 @@ impl UserInfo {
             amount_left: "".to_string(),
             playtime_today: "".to_string(),
             days_last_played: "".to_string(),
+            weekly_playtime: "".to_string(),
+            monthly_playtime: "".to_string(),
             total_interest_accrued: 0.0,
             color: "Red".to_string(),
             matches: "None".to_string(),
@@ -289,10 +293,10 @@ async fn update_debt_hours(
                     if new_month {
                         let monthy_hours = user.get_monthly_hours();
                         if monthy_hours < 5.0 {
-                            playtime_outer = total_hours + (hours_left * 0.05);
+                            playtime_outer = total_hours + round_after_math(hours_left * 0.05);
                             // Come back and fix this when db is updated
                             user.set_interest_accrued(
-                                user.get_interest_accrued() + (hours_left * 0.05),
+                                user.get_interest_accrued() + round_after_math(hours_left * 0.05),
                             );
                             user_info.total_interest_accrued = user.get_interest_accrued();
                             playtime_outer = round_after_math(playtime_outer);
@@ -302,6 +306,14 @@ async fn update_debt_hours(
                         // reset monthly play counter
                         user.set_monthly_hours(0.0);
                     }
+                    user_info.weekly_playtime = String::from(&format!(
+                        "`has played {} hours this week!`",
+                        user.get_weekly_hours()
+                    ));
+                    user_info.monthly_playtime = String::from(&format!(
+                        "`has played {} hours this month!`",
+                        user.get_monthly_hours()
+                    ));
                     user_vec.push(user_info);
                 }
                 // Check to see if its a new week and if so reset available betting hours
