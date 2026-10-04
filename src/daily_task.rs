@@ -296,7 +296,7 @@ async fn update_debt_hours(
                             playtime_outer = total_hours + round_after_math(hours_left * 0.05);
                             // Come back and fix this when db is updated
                             user.set_interest_accrued(
-                                user.get_interest_accrued() + round_after_math(hours_left * 0.05),
+                                round_after_math(user.get_interest_accrued() + round_after_math(hours_left * 0.05)),
                             );
                             user_info.total_interest_accrued = user.get_interest_accrued();
                             playtime_outer = round_after_math(playtime_outer);
@@ -305,6 +305,10 @@ async fn update_debt_hours(
                         }
                         // reset monthly play counter
                         user.set_monthly_hours(0.0);
+                    }
+                    let is_done_initial = is_initial_done(hours_left, user.get_interest_accrued());
+                    if is_done_initial && user_info.color == "Red" {
+                        user_info.color = "Yellow".to_string();
                     }
                     user_info.weekly_playtime = String::from(&format!(
                         "`has played {} hours this week!`",
@@ -407,6 +411,12 @@ pub fn get_user_debts(db: Arc<Mutex<Connection>>) -> String {
     message
 }
 
+pub fn is_initial_done(left: f32, interest: f32) -> bool {
+    // we do this instead of just checking if they are equal because of potential
+    // floating point rounding errors
+    return round_after_math(left - interest) == 0.0
+}
+
 pub fn round_after_math(val: f32) -> f32 {
     (val * 100.0).trunc() / 100.0
 }
@@ -426,6 +436,13 @@ mod tests {
     fn test_round_after_math_negative() {
         assert_eq!(round_after_math(-1.239), -1.23);
         assert_eq!(round_after_math(-0.001), 0.0);
+    }
+
+    #[test]
+    fn test_is_initial_done() {
+        assert_eq!(is_initial_done(42.79, 39.92), false);
+        assert_eq!(is_initial_done(188.8, 127.976), false);
+        assert_eq!(is_initial_done(20.0, 20.0), true);
     }
 }
 

@@ -1,6 +1,7 @@
 mod bet;
 mod daily_task;
 mod db;
+use crate::daily_task::round_after_math;
 use crate::db::User;
 use once_cell::sync::Lazy;
 use rand::Rng;
@@ -94,7 +95,7 @@ impl EventHandler for Handler {
         }
         let tree_channel = ChannelId::new(TREE_CHANNEL_ID);
         let kazoo_channel = ChannelId::new(KAZOO_CHANNEL_ID);
-        let release_message = "Minor feature, daily message now displays weekly and monthly playtime. Also if monthly playtime target is hit then the debtor will avoid being kicked from call.";
+        let release_message = "Minor feature, when a debtor only has interest hours left the daily message will show up with a yellow border if they have not played that day";
         let _ = tree_channel.say(&ctx.http, release_message).await;
         let _ = kazoo_channel.say(&ctx.http, release_message).await;
         tokio::spawn({
@@ -122,6 +123,8 @@ impl EventHandler for Handler {
                         let color;
                         if user.color == "Red" {
                             color = Color::from_rgb(255, 0, 0);
+                        } else if user.color == "Yellow" {
+                            color = Color::from_rgb(255, 255, 0);
                         } else {
                             color = Color::from_rgb(0, 255, 0);
                         }
@@ -229,6 +232,11 @@ impl EventHandler for Handler {
         let steam_id = joined_user.get_steamid().to_string();
 
         if !owes_hours {
+            return;
+        }
+        // if only interest hours are left we be nice and stop the kick from happening
+        let is_initial_done = daily_task::is_initial_done(round_after_math(joined_user.get_hours_owed() - joined_user.get_playtime()), joined_user.get_interest_accrued());
+        if is_initial_done {
             return;
         }
         let weekly_hours = joined_user.get_weekly_hours();
