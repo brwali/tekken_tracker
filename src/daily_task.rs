@@ -413,8 +413,9 @@ pub fn get_user_debts(db: Arc<Mutex<Connection>>) -> String {
 
 pub fn is_initial_done(left: f32, interest: f32) -> bool {
     // we do this instead of just checking if they are equal because of potential
-    // floating point rounding errors
-    return round_after_math(left - interest) == 0.0
+    // floating point rounding errors. Also im pretty sure I never subtract the interest
+    // hours so if its negative then thats also done
+    return round_after_math(left - interest) <= 0.0
 }
 
 pub fn round_after_math(val: f32) -> f32 {
